@@ -28,6 +28,7 @@
             console.log('[BuildPopup] Initialized for job:', currentJobName, 'apiBase:', apiBase);
 
             var isChecking = false;
+            var _bpAllowBtn = false;
 
             function showModal(data, onDismiss) {
                 var existing = document.getElementById('build-popup-overlay');
@@ -203,93 +204,47 @@
                 form.submit();
             }
 
-            // Collect current parameter values from the build form
+            // Collect actual parameter values from the build form for Groovy check
+            // Only collects named inputs that look like Jenkins parameters
             function collectFormParams(form) {
                 var params = {};
-                var inputs = form.querySelectorAll('input, select, textarea');
-                for (var i = 0; i < inputs.length; i++) {
-                    var input = inputs[i];
-                    var name = input.name;
-                    if (!name || name === 'json' || name === 'Jenkins-Crumb' || name === 'Submit') continue;
-                    if (input.type === 'checkbox' || input.type === 'radio') {
-                        if (input.checked) {
-                            params[name] = input.value;
+                // Look for Jenkins parameter rows: .repeated-chunk, .jenkins-parameters, or named inputs
+                var paramContainers = form.querySelectorAll('.repeated-chunk, .jenkins-parameters');
+                if (paramContainers.length > 0) {
+                    for (var c = 0; c < paramContainers.length; c++) {
+                        var inputs = paramContainers[c].querySelectorAll('input, select, textarea');
+                        for (var i = 0; i < inputs.length; i++) {
+                            var input = inputs[i];
+                            var name = input.name;
+                            if (!name || name === 'json' || name === 'Jenkins-Crumb' || name === 'Submit' || name === '.reachable') continue;
+                            if (input.type === 'hidden') continue;
+                            if (input.type === 'checkbox' || input.type === 'radio') {
+                                if (input.checked) params[name] = input.value;
+                            } else if (input.type !== 'file') {
+                                if (input.value !== undefined && input.value !== null) {
+                                    params[name] = input.value;
+                                }
+                            }
                         }
-                    } else if (input.type !== 'file') {
-                        if (input.value !== undefined && input.value !== null) {
-                            params[name] = input.value;
+                    }
+                } else {
+                    // Fallback: collect visible named inputs
+                    var allInputs = form.querySelectorAll('input, select, textarea');
+                    for (var i = 0; i < allInputs.length; i++) {
+                        var input = allInputs[i];
+                        var name = input.name;
+                        if (!name || name === 'json' || name === 'Jenkins-Crumb' || name === 'Submit' || name === '.reachable' || name === 'value') continue;
+                        if (input.type === 'hidden') continue;
+                        if (input.type === 'checkbox' || input.type === 'radio') {
+                            if (input.checked) params[name] = input.value;
+                        } else if (input.type !== 'file') {
+                            if (input.value !== undefined && input.value !== null) {
+                                params[name] = input.value;
+                            }
                         }
                     }
                 }
                 return params;
-            }
-
-            // Submit parameterized build form via hidden form with JSON params
-            function submitBuildForm(form) {
-                var crumbValue = getCrumb();
-                var action = form.getAttribute('action') || 'build';
-                var a = document.createElement('a');
-                a.href = action;
-                var buildUrl = a.href;
-
-                console.log('[BuildPopup] Submitting parameterized build to:', buildUrl, 'crumb:', crumbValue ? 'found' : 'not found');
-
-                // Collect parameter name-value pairs
-                var paramList = [];
-                var seen = {};
-                var inputs = form.querySelectorAll('input, select, textarea');
-                for (var i = 0; i < inputs.length; i++) {
-                    var input = inputs[i];
-                    var name = input.name;
-                    if (!name || name === 'json' || name === 'Jenkins-Crumb' || name === 'Submit') continue;
-                    if (seen[name]) continue;
-
-                    var value = '';
-                    if (input.type === 'checkbox' || input.type === 'radio') {
-                        if (input.checked) {
-                            value = input.value;
-                            seen[name] = true;
-                        }
-                    } else if (input.type !== 'file') {
-                        value = input.value;
-                        seen[name] = true;
-                    }
-
-                    if (seen[name]) {
-                        paramList.push({name: name, value: value});
-                    }
-                }
-
-                var jsonData;
-                if (paramList.length > 0) {
-                    jsonData = JSON.stringify({parameter: paramList});
-                } else {
-                    jsonData = '{}';
-                }
-                console.log('[BuildPopup] JSON params:', jsonData);
-
-                // Create hidden form and submit
-                var hiddenForm = document.createElement('form');
-                hiddenForm.method = 'POST';
-                hiddenForm.action = buildUrl;
-                hiddenForm.style.display = 'none';
-
-                if (crumbValue) {
-                    var ci = document.createElement('input');
-                    ci.type = 'hidden';
-                    ci.name = 'Jenkins-Crumb';
-                    ci.value = crumbValue;
-                    hiddenForm.appendChild(ci);
-                }
-
-                var ji = document.createElement('input');
-                ji.type = 'hidden';
-                ji.name = 'json';
-                ji.value = jsonData;
-                hiddenForm.appendChild(ji);
-
-                document.body.appendChild(hiddenForm);
-                hiddenForm.submit();
             }
 
             // Check if element is the non-parameterized "Build Now" link
@@ -335,6 +290,7 @@
 
             // Intercept Build button clicks on parameter forms
             // The check runs AFTER user fills in parameters, with actual parameter values
+            // After check passes, let Jenkins native form handler submit (via _bpAllowBtn flag)
             function interceptBuildForms() {
                 var forms = document.querySelectorAll('form');
                 for (var i = 0; i < forms.length; i++) {
@@ -351,18 +307,26 @@
                         for (var j = 0; j < submitBtns.length; j++) {
                             (function(btn) {
                                 btn.addEventListener('click', function(e) {
+                                    if (_bpAllowBtn) {
+                                        _bpAllowBtn = false;
+                                        console.log('[BuildPopup] Allowing form button click through');
+                                        return;
+                                    }
+
                                     e.preventDefault();
                                     e.stopPropagation();
                                     e.stopImmediatePropagation();
 
                                     console.log('[BuildPopup] Intercepted build form button click');
 
-                                    // Collect actual parameter values filled by user
+                                    // Collect actual parameter values filled by user for Groovy check
                                     var formParams = collectFormParams(form);
 
                                     checkBeforeBuild(function(allow) {
                                         if (allow) {
-                                            submitBuildForm(form);
+                                            // Let the native Jenkins handler submit the form
+                                            _bpAllowBtn = true;
+                                            btn.click();
                                         }
                                     }, formParams);
                                 }, true);
