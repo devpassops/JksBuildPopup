@@ -28,6 +28,7 @@
             console.log('[BuildPopup] Initialized for job:', currentJobName, 'apiBase:', apiBase);
 
             var isChecking = false;
+            var _bpAllowNextClick = false;
 
             function showModal(data, onDismiss) {
                 var existing = document.getElementById('build-popup-overlay');
@@ -162,13 +163,10 @@
 
             // Get Jenkins CRUMB token for CSRF protection
             function getCrumb() {
-                // Try meta tag first (Jenkins standard)
                 var meta = document.querySelector('meta[name="crumb"]');
                 if (meta && meta.content) return meta.content;
-                // Try hidden input in existing forms
                 var crumbInput = document.querySelector('input[name="Jenkins-Crumb"]');
                 if (crumbInput && crumbInput.value) return crumbInput.value;
-                // Try global JS variable
                 try { if (typeof crumb !== 'undefined' && crumb) return crumb; } catch(e) {}
                 return '';
             }
@@ -176,7 +174,6 @@
             // Trigger build via POST for non-parameterized jobs (with CRUMB)
             function triggerBuildPost(link) {
                 var href = link.getAttribute('href') || '';
-                // Resolve relative URL to absolute
                 var a = document.createElement('a');
                 a.href = href;
                 var buildUrl = a.href;
@@ -184,26 +181,23 @@
                 var crumbValue = getCrumb();
                 console.log('[BuildPopup] Triggering build POST:', buildUrl, 'crumb:', crumbValue ? 'found' : 'not found');
 
-                // Use fetch with CRUMB header
                 fetch(buildUrl, {
                     method: 'POST',
                     headers: {
-                        'Jenkins-Crumb': crumbValue,
-                        'Content-Type': 'application/x-www-form-urlencoded'
+                        'Jenkins-Crumb': crumbValue
                     },
                     credentials: 'same-origin'
                 }).then(function(response) {
-                    if (response.ok) {
+                    if (response.ok || response.status === 302) {
                         console.log('[BuildPopup] Build triggered successfully');
                         window.location.reload();
                     } else {
                         console.error('[BuildPopup] Build trigger failed:', response.status);
-                        // Fallback: try navigating to the URL (may work for some Jenkins configs)
-                        window.location.href = buildUrl;
+                        window.location.reload();
                     }
                 }).catch(function(err) {
                     console.error('[BuildPopup] Build trigger error:', err);
-                    window.location.href = buildUrl;
+                    window.location.reload();
                 });
             }
 
@@ -211,10 +205,8 @@
             function isNonParameterizedBuildLink(el) {
                 if (!el || el.tagName !== 'A') return false;
                 var href = el.getAttribute('href') || '';
-                // Exact match for build links (NOT buildWithParameters)
                 if (href === 'build' || href === './build') return true;
                 if (href.indexOf('build?delay=') === 0 || href.indexOf('./build?delay=') === 0) return true;
-                // task-link with build href but NOT buildWithParameters
                 if (el.classList && el.classList.contains('task-link')) {
                     if (href.indexOf('build') >= 0 && href.indexOf('buildWithParameters') < 0) return true;
                 }
@@ -242,7 +234,7 @@
                 return null;
             }
 
-            // Intercept Build Now link clicks (capturing phase)
+            // Intercept Build Now / Build with Parameters link clicks (sidebar)
             document.addEventListener('click', function(e) {
                 var linkInfo = findBuildTriggerLink(e.target);
                 if (!linkInfo) return;
@@ -259,46 +251,56 @@
                 checkBeforeBuild(function(allow) {
                     if (allow) {
                         if (linkType === 'build') {
-                            // Non-parameterized: POST to build URL
                             triggerBuildPost(link);
                         } else {
-                            // buildWithParameters: navigate to the parameters page
                             window.location.href = link.href;
                         }
                     }
                 });
             }, true);
 
-            // Intercept build form submissions (on buildWithParameters page)
+            // Intercept submit button clicks on build parameter forms
+            // Must intercept button click (not form submit) to preserve Jenkins JS form handler
             function interceptBuildForms() {
                 var forms = document.querySelectorAll('form');
                 for (var i = 0; i < forms.length; i++) {
                     (function(form) {
                         if (form.getAttribute('data-buildpopup-intercepted')) return;
                         var action = form.getAttribute('action') || '';
-                        // Only intercept forms that submit to build/buildWithParameters
                         if (action.indexOf('build') < 0) return;
-                        // Skip non-build forms (e.g., search forms)
                         if (action.indexOf('buildWithParameters') < 0 &&
                             action !== 'build' && action.indexOf('build?') !== 0) return;
 
                         form.setAttribute('data-buildpopup-intercepted', 'true');
 
-                        form.addEventListener('submit', function(e) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            e.stopImmediatePropagation();
+                        // Find the submit button
+                        var submitBtns = form.querySelectorAll('button, input[type="submit"], .yui-submit-button');
+                        for (var j = 0; j < submitBtns.length; j++) {
+                            (function(btn) {
+                                btn.addEventListener('click', function(e) {
+                                    // Allow if we already checked
+                                    if (_bpAllowNextClick) {
+                                        _bpAllowNextClick = false;
+                                        console.log('[BuildPopup] Allowing button click through');
+                                        return;
+                                    }
 
-                            console.log('[BuildPopup] Intercepted build form submit, action:', action);
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    e.stopImmediatePropagation();
 
-                            checkBeforeBuild(function(allow) {
-                                if (allow) {
-                                    // Remove interception flag, then submit normally
-                                    form.removeAttribute('data-buildpopup-intercepted');
-                                    form.submit();
-                                }
-                            });
-                        }, true);
+                                    console.log('[BuildPopup] Intercepted build button click');
+
+                                    checkBeforeBuild(function(allow) {
+                                        if (allow) {
+                                            // Set flag and re-click the button to trigger Jenkins normal flow
+                                            _bpAllowNextClick = true;
+                                            btn.click();
+                                        }
+                                    });
+                                }, true);
+                            })(submitBtns[j]);
+                        }
                     })(forms[i]);
                 }
             }
@@ -314,7 +316,6 @@
                 init();
             }
 
-            // Re-scan for dynamically added forms
             setTimeout(interceptBuildForms, 1000);
             setTimeout(interceptBuildForms, 3000);
         })();

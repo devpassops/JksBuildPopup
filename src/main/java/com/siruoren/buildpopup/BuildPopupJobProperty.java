@@ -16,10 +16,10 @@ import java.util.logging.Logger;
  * <p>
  * Groovy 脚本返回 Map 的固定参数名（写在描述信息中）：
  * - blockBuild (Boolean): 是否阻断构建，默认 false
- * - showPopup (Boolean): 是否显示弹窗，默认 true
+ * - showPopup (Boolean): 是否显示弹窗，默认 false
  * - popupContent (String): 弹窗内容
  * <p>
- * 参数不定义时默认为 blockBuild=false, showPopup=true
+ * 参数不定义时默认为 blockBuild=false, showPopup=false
  * </p>
  */
 public class BuildPopupJobProperty extends JobProperty<Job<?, ?>> {
@@ -89,7 +89,7 @@ public class BuildPopupJobProperty extends JobProperty<Job<?, ?>> {
                 + "// MUST return a Map: return [blockBuild: true, showPopup: true, popupContent: 'msg']\n"
                 + "// Keys:\n"
                 + "//   blockBuild  - Boolean, true=block build (only show popup), default=false\n"
-                + "//   showPopup   - Boolean, true=show popup, default=true\n"
+                + "//   showPopup   - Boolean, true=show popup, default=false\n"
                 + "//   popupContent - String, popup message\n"
                 + "// Use Map literal [key: value], NOT method call like popupContent('xxx')\n"
                 + "\n"

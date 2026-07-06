@@ -22,7 +22,7 @@ import java.util.logging.Logger;
  * 3. 每个 Job 的并发数受全局配置 maxConcurrentPerJob 限制
  * 4. Groovy 脚本执行有超时控制，防止脚本死循环导致线程泄露
  * 5. 脚本返回 Map 参数名固定：blockBuild, showPopup, popupContent
- * 6. 参数不定义时默认为 true（blockBuild=true, showPopup=true）
+ * 6. 参数不定义时默认为 false（blockBuild=false, showPopup=false）
  * </p>
  */
 public class BuildPopupService {
@@ -180,13 +180,13 @@ public class BuildPopupService {
             if (scriptResult instanceof Map) {
                 Map<?, ?> resultMap = (Map<?, ?>) scriptResult;
 
-                // 参数不定义默认为 true（showPopup）、false（blockBuild）
+                // 参数不定义默认为 false
                 Object blockVal = resultMap.get(KEY_BLOCK_BUILD);
                 Object showVal = resultMap.get(KEY_SHOW_POPUP);
                 Object contentVal = resultMap.get(KEY_POPUP_CONTENT);
 
                 result.setBlockBuild(toBoolean(blockVal, false));
-                result.setShowPopup(toBoolean(showVal, true));
+                result.setShowPopup(toBoolean(showVal, false));
                 result.setPopupContent(contentVal != null ? contentVal.toString() : "");
             } else if (scriptResult instanceof Boolean) {
                 // Boolean 返回值直接作为 blockBuild 判断，showPopup 默认跟随
@@ -199,9 +199,9 @@ public class BuildPopupService {
                 result.setBlockBuild(true);
                 result.setShowPopup(true);
             } else {
-                // 返回 null，默认弹窗但不阻断
+                // 返回 null，默认不阻断不弹窗
                 result.setBlockBuild(false);
-                result.setShowPopup(true);
+                result.setShowPopup(false);
                 result.setPopupContent(Messages.BuildPopupService_defaultPopupContent(job.getFullName()));
             }
 
