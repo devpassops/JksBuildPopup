@@ -1,0 +1,28 @@
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+    <f:optionalBlock name="enabled" title="${%enabledTitle}" checked="${instance.enabled}" inline="true">
+        <f:entry title="${%groovyScriptTitle}" description="${%groovyScriptDescription}">
+            <f:textarea name="groovyScript" value="${instance.groovyScript}" 
+                        default="${descriptor.defaultGroovyScript}"/>
+        </f:entry>
+
+        <f:entry title="${%blockBuildParamTitle}" description="${%blockBuildParamDescription}">
+            <f:textbox name="blockBuildParam" value="${instance.blockBuildParam}" 
+                       default="${descriptor.defaultBlockBuildParam}"/>
+        </f:entry>
+
+        <f:entry title="${%showPopupParamTitle}" description="${%showPopupParamDescription}">
+            <f:textbox name="showPopupParam" value="${instance.showPopupParam}" 
+                       default="${descriptor.defaultShowPopupParam}"/>
+        </f:entry>
+
+        <f:entry title="${%popupContentParamTitle}" description="${%popupContentParamDescription}">
+            <f:textbox name="popupContentParam" value="${instance.popupContentParam}" 
+                       default="${descriptor.defaultPopupContentParam}"/>
+        </f:entry>
+
+        <f:entry title="${%scriptTimeoutTitle}" description="${%scriptTimeoutDescription}">
+            <f:number name="scriptTimeout" value="${instance.scriptTimeout}" 
+                      default="${descriptor.defaultScriptTimeout}" min="1" max="300"/>
+        </f:entry>
+    </f:optionalBlock>
+</j:jelly>
