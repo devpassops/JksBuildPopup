@@ -1,6 +1,6 @@
 # JksBuildPopup - Jenkins 构建弹窗检查插件
 
-**版本**: 1.0.0
+**版本**: 1.0.0-SNAPSHOT
 
 ## 简介
 
