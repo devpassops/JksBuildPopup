@@ -10,6 +10,7 @@ import org.kohsuke.stapler.StaplerResponse;
 
 import javax.servlet.http.HttpServletResponse;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -101,8 +102,21 @@ public class BuildPopupWebAPI implements UnprotectedRootAction {
             return;
         }
 
-        // 获取 Job 默认参数
+        // 获取 Job 默认参数，并用前端传入的实际参数覆盖
         Map<String, String> params = getDefaultParams(job);
+        String formParamsJson = req.getParameter("formParams");
+        if (formParamsJson != null && !formParamsJson.isEmpty()) {
+            try {
+                JSONObject providedParams = JSONObject.fromObject(formParamsJson);
+                Iterator<?> keys = providedParams.keys();
+                while (keys.hasNext()) {
+                    String key = (String) keys.next();
+                    params.put(key, providedParams.getString(key));
+                }
+            } catch (Exception e) {
+                LOGGER.log(Level.FINE, "Failed to parse formParams for job " + jobName, e);
+            }
+        }
         Map<String, String> envVars = new HashMap<>();
 
         LOGGER.log(Level.INFO, "BuildPopup checking job {0} before build (form interception)", jobName);
@@ -116,6 +130,7 @@ public class BuildPopupWebAPI implements UnprotectedRootAction {
         json.put("blockBuild", result.isBlockBuild());
         json.put("showPopup", result.isShowPopup());
         json.put("popupContent", result.getPopupContent());
+        json.put("popupTitle", result.getPopupTitle());
         json.put("error", result.isError());
         json.put("errorMessage", result.getErrorMessage());
         json.put("executionTimeMs", result.getExecutionTimeMs());
@@ -143,6 +158,7 @@ public class BuildPopupWebAPI implements UnprotectedRootAction {
             json.put("showPopup", result.isShowPopup());
             json.put("blockBuild", result.isBlockBuild());
             json.put("popupContent", result.getPopupContent());
+            json.put("popupTitle", result.getPopupTitle());
             json.put("error", result.isError());
             json.put("errorMessage", result.getErrorMessage());
             json.put("executionTimeMs", result.getExecutionTimeMs());

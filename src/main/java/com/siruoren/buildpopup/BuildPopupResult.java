@@ -16,6 +16,9 @@ public class BuildPopupResult {
     /** 弹窗显示内容 */
     private String popupContent;
 
+    /** 弹窗标题 */
+    private String popupTitle;
+
     /** 执行是否出错 */
     private boolean error;
 
@@ -35,6 +38,7 @@ public class BuildPopupResult {
         this.showPopup = false;
         this.blockBuild = false;
         this.popupContent = "";
+        this.popupTitle = "";
         this.error = false;
         this.errorMessage = "";
         this.executionTimeMs = 0;
@@ -64,6 +68,14 @@ public class BuildPopupResult {
 
     public void setPopupContent(String popupContent) {
         this.popupContent = popupContent;
+    }
+
+    public String getPopupTitle() {
+        return popupTitle;
+    }
+
+    public void setPopupTitle(String popupTitle) {
+        this.popupTitle = popupTitle;
     }
 
     public boolean isError() {

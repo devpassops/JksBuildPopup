@@ -18,6 +18,7 @@ import java.util.logging.Logger;
  * - blockBuild (Boolean): 是否阻断构建，默认 false
  * - showPopup (Boolean): 是否显示弹窗，默认 false
  * - popupContent (String): 弹窗内容
+ * - popupTitle (String): 弹窗标题，默认 "Build Notification"
  * <p>
  * 参数不定义时默认为 blockBuild=false, showPopup=false
  * </p>
@@ -86,11 +87,12 @@ public class BuildPopupJobProperty extends JobProperty<Job<?, ?>> {
         public String getDefaultGroovyScript() {
             return "// Build Popup Groovy Script\n"
                 + "// Bindings: job, jenkins, env, params\n"
-                + "// MUST return a Map: return [blockBuild: true, showPopup: true, popupContent: 'msg']\n"
+                + "// MUST return a Map: return [blockBuild: true, showPopup: true, popupContent: 'msg', popupTitle: 'title']\n"
                 + "// Keys:\n"
-                + "//   blockBuild  - Boolean, true=block build (only show popup), default=false\n"
-                + "//   showPopup   - Boolean, true=show popup, default=false\n"
+                + "//   blockBuild   - Boolean, true=block build (only show popup), default=false\n"
+                + "//   showPopup    - Boolean, true=show popup, default=false\n"
                 + "//   popupContent - String, popup message\n"
+                + "//   popupTitle   - String, popup title, default='Build Notification'\n"
                 + "// Use Map literal [key: value], NOT method call like popupContent('xxx')\n"
                 + "\n"
                 + "if (job.isBuilding()) {\n"

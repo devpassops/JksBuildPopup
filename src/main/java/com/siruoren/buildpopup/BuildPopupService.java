@@ -35,6 +35,7 @@ public class BuildPopupService {
     static final String KEY_BLOCK_BUILD = "blockBuild";
     static final String KEY_SHOW_POPUP = "showPopup";
     static final String KEY_POPUP_CONTENT = "popupContent";
+    static final String KEY_POPUP_TITLE = "popupTitle";
 
     /** 每个 Job 正在执行 Groovy 的计数器 */
     private final ConcurrentHashMap<String, AtomicInteger> jobConcurrencyMap = new ConcurrentHashMap<>();
@@ -184,10 +185,12 @@ public class BuildPopupService {
                 Object blockVal = resultMap.get(KEY_BLOCK_BUILD);
                 Object showVal = resultMap.get(KEY_SHOW_POPUP);
                 Object contentVal = resultMap.get(KEY_POPUP_CONTENT);
+                Object titleVal = resultMap.get(KEY_POPUP_TITLE);
 
                 result.setBlockBuild(toBoolean(blockVal, false));
                 result.setShowPopup(toBoolean(showVal, false));
                 result.setPopupContent(contentVal != null ? contentVal.toString() : "");
+                result.setPopupTitle(titleVal != null ? titleVal.toString() : "");
             } else if (scriptResult instanceof Boolean) {
                 // Boolean 返回值直接作为 blockBuild 判断，showPopup 默认跟随
                 result.setBlockBuild((Boolean) scriptResult);

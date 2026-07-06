@@ -1,5 +1,7 @@
 # JksBuildPopup - Jenkins 构建弹窗检查插件
 
+**版本**: 1.0.0
+
 ## 简介
 
 JksBuildPopup 是一个 Jenkins 插件，在任务构建前执行 Groovy 脚本进行条件判断，根据判断结果决定是否弹窗提醒或阻断构建。

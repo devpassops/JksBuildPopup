@@ -28,7 +28,6 @@
             console.log('[BuildPopup] Initialized for job:', currentJobName, 'apiBase:', apiBase);
 
             var isChecking = false;
-            var _bpAllowNextClick = false;
 
             function showModal(data, onDismiss) {
                 var existing = document.getElementById('build-popup-overlay');
@@ -53,9 +52,11 @@
                 var contentDiv = document.createElement('div');
                 contentDiv.style.cssText = 'border-left:4px solid ' + borderColor + ';padding:12px 16px;background:' + bgColor + ';margin-bottom:16px;border-radius:4px;';
 
+                var titleText = data.popupTitle || (data.error ? 'Script Error' : (data.blockBuild ? 'Build Blocked' : 'Build Notification'));
+
                 var h3 = document.createElement('h3');
                 h3.style.cssText = 'margin:0 0 8px 0;color:' + borderColor + ';';
-                h3.textContent = icon + ' ' + (data.error ? 'Script Error' : (data.blockBuild ? 'Build Blocked' : 'Build Notification'));
+                h3.textContent = icon + ' ' + titleText;
 
                 var msgDiv = document.createElement('div');
                 msgDiv.style.cssText = 'white-space:pre-wrap;margin:0;';
@@ -112,12 +113,25 @@
                 if (loading) loading.remove();
             }
 
-            function checkBeforeBuild(callback) {
+            function getCrumb() {
+                var meta = document.querySelector('meta[name="crumb"]');
+                if (meta && meta.content) return meta.content;
+                var crumbInput = document.querySelector('input[name="Jenkins-Crumb"]');
+                if (crumbInput && crumbInput.value) return crumbInput.value;
+                try { if (typeof crumb !== 'undefined' && crumb) return crumb; } catch(e) {}
+                return '';
+            }
+
+            // Check before build, optionally with actual form parameter values
+            function checkBeforeBuild(callback, formParams) {
                 if (isChecking) return;
                 isChecking = true;
                 showLoading();
 
                 var url = apiBase + '/check?job=' + encodeURIComponent(currentJobName);
+                if (formParams && Object.keys(formParams).length > 0) {
+                    url += '&formParams=' + encodeURIComponent(JSON.stringify(formParams));
+                }
                 console.log('[BuildPopup] Checking:', url);
 
                 var xhr = new XMLHttpRequest();
@@ -133,7 +147,7 @@
                                 var data = JSON.parse(xhr.responseText);
                                 console.log('[BuildPopup] Check result:', data);
                                 if (data.blockBuild) {
-                                    showModal(data);
+                                    showModal(data, null);
                                     callback(false);
                                 } else if (data.showPopup) {
                                     showModal(data, function() {
@@ -161,106 +175,166 @@
                 xhr.send();
             }
 
-            // Get Jenkins CRUMB token for CSRF protection
-            function getCrumb() {
-                var meta = document.querySelector('meta[name="crumb"]');
-                if (meta && meta.content) return meta.content;
-                var crumbInput = document.querySelector('input[name="Jenkins-Crumb"]');
-                if (crumbInput && crumbInput.value) return crumbInput.value;
-                try { if (typeof crumb !== 'undefined' && crumb) return crumb; } catch(e) {}
-                return '';
-            }
-
-            // Trigger build via POST for non-parameterized jobs (with CRUMB)
-            function triggerBuildPost(link) {
-                var href = link.getAttribute('href') || '';
-                var a = document.createElement('a');
-                a.href = href;
-                var buildUrl = a.href;
-
+            // Trigger non-parameterized build via hidden form
+            function triggerBuildPost(buildUrl) {
                 var crumbValue = getCrumb();
                 console.log('[BuildPopup] Triggering build POST:', buildUrl, 'crumb:', crumbValue ? 'found' : 'not found');
 
-                fetch(buildUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Jenkins-Crumb': crumbValue
-                    },
-                    credentials: 'same-origin'
-                }).then(function(response) {
-                    if (response.ok || response.status === 302) {
-                        console.log('[BuildPopup] Build triggered successfully');
-                        window.location.reload();
-                    } else {
-                        console.error('[BuildPopup] Build trigger failed:', response.status);
-                        window.location.reload();
-                    }
-                }).catch(function(err) {
-                    console.error('[BuildPopup] Build trigger error:', err);
-                    window.location.reload();
-                });
+                var form = document.createElement('form');
+                form.setAttribute('method', 'POST');
+                form.setAttribute('action', buildUrl);
+                form.style.display = 'none';
+
+                if (crumbValue) {
+                    var crumbInput = document.createElement('input');
+                    crumbInput.setAttribute('type', 'hidden');
+                    crumbInput.setAttribute('name', 'Jenkins-Crumb');
+                    crumbInput.setAttribute('value', crumbValue);
+                    form.appendChild(crumbInput);
+                }
+
+                var jsonInput = document.createElement('input');
+                jsonInput.setAttribute('type', 'hidden');
+                jsonInput.setAttribute('name', 'json');
+                jsonInput.setAttribute('value', '{}');
+                form.appendChild(jsonInput);
+
+                document.body.appendChild(form);
+                form.submit();
             }
 
-            // Check if a link is the non-parameterized "Build Now" link
-            function isNonParameterizedBuildLink(el) {
+            // Collect current parameter values from the build form
+            function collectFormParams(form) {
+                var params = {};
+                var inputs = form.querySelectorAll('input, select, textarea');
+                for (var i = 0; i < inputs.length; i++) {
+                    var input = inputs[i];
+                    var name = input.name;
+                    if (!name || name === 'json' || name === 'Jenkins-Crumb' || name === 'Submit') continue;
+                    if (input.type === 'checkbox' || input.type === 'radio') {
+                        if (input.checked) {
+                            params[name] = input.value;
+                        }
+                    } else if (input.type !== 'file') {
+                        if (input.value !== undefined && input.value !== null) {
+                            params[name] = input.value;
+                        }
+                    }
+                }
+                return params;
+            }
+
+            // Submit parameterized build form via hidden form with JSON params
+            function submitBuildForm(form) {
+                var crumbValue = getCrumb();
+                var action = form.getAttribute('action') || 'build';
+                var a = document.createElement('a');
+                a.href = action;
+                var buildUrl = a.href;
+
+                console.log('[BuildPopup] Submitting parameterized build to:', buildUrl, 'crumb:', crumbValue ? 'found' : 'not found');
+
+                // Collect parameter name-value pairs
+                var paramList = [];
+                var seen = {};
+                var inputs = form.querySelectorAll('input, select, textarea');
+                for (var i = 0; i < inputs.length; i++) {
+                    var input = inputs[i];
+                    var name = input.name;
+                    if (!name || name === 'json' || name === 'Jenkins-Crumb' || name === 'Submit') continue;
+                    if (seen[name]) continue;
+
+                    var value = '';
+                    if (input.type === 'checkbox' || input.type === 'radio') {
+                        if (input.checked) {
+                            value = input.value;
+                            seen[name] = true;
+                        }
+                    } else if (input.type !== 'file') {
+                        value = input.value;
+                        seen[name] = true;
+                    }
+
+                    if (seen[name]) {
+                        paramList.push({name: name, value: value});
+                    }
+                }
+
+                var jsonData;
+                if (paramList.length > 0) {
+                    jsonData = JSON.stringify({parameter: paramList});
+                } else {
+                    jsonData = '{}';
+                }
+                console.log('[BuildPopup] JSON params:', jsonData);
+
+                // Create hidden form and submit
+                var hiddenForm = document.createElement('form');
+                hiddenForm.method = 'POST';
+                hiddenForm.action = buildUrl;
+                hiddenForm.style.display = 'none';
+
+                if (crumbValue) {
+                    var ci = document.createElement('input');
+                    ci.type = 'hidden';
+                    ci.name = 'Jenkins-Crumb';
+                    ci.value = crumbValue;
+                    hiddenForm.appendChild(ci);
+                }
+
+                var ji = document.createElement('input');
+                ji.type = 'hidden';
+                ji.name = 'json';
+                ji.value = jsonData;
+                hiddenForm.appendChild(ji);
+
+                document.body.appendChild(hiddenForm);
+                hiddenForm.submit();
+            }
+
+            // Check if element is the non-parameterized "Build Now" link
+            function isBuildNowLink(el) {
                 if (!el || el.tagName !== 'A') return false;
                 var href = el.getAttribute('href') || '';
+                // Only match "build" (not "buildWithParameters")
                 if (href === 'build' || href === './build') return true;
                 if (href.indexOf('build?delay=') === 0 || href.indexOf('./build?delay=') === 0) return true;
                 if (el.classList && el.classList.contains('task-link')) {
-                    if (href.indexOf('build') >= 0 && href.indexOf('buildWithParameters') < 0) return true;
+                    if (href === 'build' || href.indexOf('build?delay=') === 0 ||
+                        href === './build' || href.indexOf('./build?delay=') === 0) return true;
                 }
                 return false;
             }
 
-            // Check if a link is the "Build with Parameters" link
-            function isBuildWithParametersLink(el) {
-                if (!el || el.tagName !== 'A') return false;
-                var href = el.getAttribute('href') || '';
-                return href.indexOf('buildWithParameters') >= 0 ||
-                       (el.classList && el.classList.contains('task-link') && href.indexOf('buildWithParameters') >= 0);
-            }
-
-            function findBuildTriggerLink(el) {
+            // Only intercept non-parameterized "Build Now" link clicks
+            // "Build with Parameters" links navigate directly to the params page
+            document.addEventListener('click', function(e) {
+                var el = e.target;
+                var link = null;
                 while (el && el !== document) {
-                    if (isNonParameterizedBuildLink(el)) {
-                        return { element: el, type: 'build' };
-                    }
-                    if (isBuildWithParametersLink(el)) {
-                        return { element: el, type: 'buildWithParameters' };
+                    if (isBuildNowLink(el)) {
+                        link = el;
+                        break;
                     }
                     el = el.parentElement;
                 }
-                return null;
-            }
-
-            // Intercept Build Now / Build with Parameters link clicks (sidebar)
-            document.addEventListener('click', function(e) {
-                var linkInfo = findBuildTriggerLink(e.target);
-                if (!linkInfo) return;
+                if (!link) return;
 
                 e.preventDefault();
                 e.stopPropagation();
                 e.stopImmediatePropagation();
 
-                var link = linkInfo.element;
-                var linkType = linkInfo.type;
-
-                console.log('[BuildPopup] Intercepted click, type:', linkType, 'href:', link.href);
+                console.log('[BuildPopup] Intercepted Build Now click, href:', link.href);
 
                 checkBeforeBuild(function(allow) {
                     if (allow) {
-                        if (linkType === 'build') {
-                            triggerBuildPost(link);
-                        } else {
-                            window.location.href = link.href;
-                        }
+                        triggerBuildPost(link.href);
                     }
                 });
             }, true);
 
-            // Intercept submit button clicks on build parameter forms
-            // Must intercept button click (not form submit) to preserve Jenkins JS form handler
+            // Intercept Build button clicks on parameter forms
+            // The check runs AFTER user fills in parameters, with actual parameter values
             function interceptBuildForms() {
                 var forms = document.querySelectorAll('form');
                 for (var i = 0; i < forms.length; i++) {
@@ -273,31 +347,24 @@
 
                         form.setAttribute('data-buildpopup-intercepted', 'true');
 
-                        // Find the submit button
                         var submitBtns = form.querySelectorAll('button, input[type="submit"], .yui-submit-button');
                         for (var j = 0; j < submitBtns.length; j++) {
                             (function(btn) {
                                 btn.addEventListener('click', function(e) {
-                                    // Allow if we already checked
-                                    if (_bpAllowNextClick) {
-                                        _bpAllowNextClick = false;
-                                        console.log('[BuildPopup] Allowing button click through');
-                                        return;
-                                    }
-
                                     e.preventDefault();
                                     e.stopPropagation();
                                     e.stopImmediatePropagation();
 
-                                    console.log('[BuildPopup] Intercepted build button click');
+                                    console.log('[BuildPopup] Intercepted build form button click');
+
+                                    // Collect actual parameter values filled by user
+                                    var formParams = collectFormParams(form);
 
                                     checkBeforeBuild(function(allow) {
                                         if (allow) {
-                                            // Set flag and re-click the button to trigger Jenkins normal flow
-                                            _bpAllowNextClick = true;
-                                            btn.click();
+                                            submitBuildForm(form);
                                         }
-                                    });
+                                    }, formParams);
                                 }, true);
                             })(submitBtns[j]);
                         }
