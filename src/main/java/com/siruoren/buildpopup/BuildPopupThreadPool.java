@@ -5,14 +5,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import hudson.init.InitMilestone;
-import hudson.init.Initializer;
-
 /**
  * 统一管理线程池，防止内存泄露。
  * 使用 ThreadPoolExecutor + 有界队列 + CallerRunsPolicy，
  * 保证大量任务并发使用时不超出线程池限制。
- * Jenkins 关闭时优雅关闭线程池。
+ * Jenkins 关闭时通过 JVM ShutdownHook 优雅关闭线程池。
  */
 public class BuildPopupThreadPool {
 
@@ -22,8 +19,13 @@ public class BuildPopupThreadPool {
 
     private volatile ThreadPoolExecutor executor;
 
+    /** 清理调度器 */
+    private volatile ScheduledExecutorService cleanupScheduler;
+
     private BuildPopupThreadPool() {
         initialize();
+        registerShutdownHook();
+        startCleanupTask();
     }
 
     public static BuildPopupThreadPool getInstance() {
@@ -111,43 +113,37 @@ public class BuildPopupThreadPool {
         return executor.getCompletedTaskCount();
     }
 
-    /**
-     * Jenkins 关闭时优雅关闭线程池，防止内存泄露
-     * 使用 COMPLETED 而非 JENKINS_STARTED（兼容 2.277.4）
-     */
-    @Initializer(after = InitMilestone.COMPLETED)
-    public static void shutdownOnJenkinsStop() {
-        // 注册 JVM 关闭钩子，确保 Jenkins 停止时线程池关闭
+    /** 注册 JVM ShutdownHook，确保 Jenkins 停止时线程池关闭 */
+    private void registerShutdownHook() {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             LOGGER.info("JVM shutting down, closing BuildPopup thread pool");
-            if (INSTANCE != null && INSTANCE.executor != null && !INSTANCE.executor.isShutdown()) {
-                INSTANCE.executor.shutdown();
+            if (executor != null && !executor.isShutdown()) {
+                executor.shutdown();
                 try {
-                    if (!INSTANCE.executor.awaitTermination(30, TimeUnit.SECONDS)) {
-                        INSTANCE.executor.shutdownNow();
+                    if (!executor.awaitTermination(30, TimeUnit.SECONDS)) {
+                        executor.shutdownNow();
                         LOGGER.warning("Thread pool did not terminate, forced shutdown");
                     }
                 } catch (InterruptedException e) {
-                    INSTANCE.executor.shutdownNow();
+                    executor.shutdownNow();
                     Thread.currentThread().interrupt();
                 }
             }
+            if (cleanupScheduler != null && !cleanupScheduler.isShutdown()) {
+                cleanupScheduler.shutdownNow();
+            }
         }));
-        // 启动定期清理任务
-        startCleanupTask();
     }
 
-    /**
-     * 定期清理过期弹窗，防止内存泄露
-     */
-    private static void startCleanupTask() {
-        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+    /** 定期清理过期弹窗，防止内存泄露 */
+    private void startCleanupTask() {
+        cleanupScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "BuildPopup-Cleanup");
             t.setDaemon(true);
             return t;
         });
         // 每60秒清理一次过期弹窗
-        scheduler.scheduleAtFixedRate(BuildPopupAction::cleanupExpired, 60, 60, TimeUnit.SECONDS);
+        cleanupScheduler.scheduleAtFixedRate(BuildPopupAction::cleanupExpired, 60, 60, TimeUnit.SECONDS);
         LOGGER.info("BuildPopup cleanup scheduler started");
     }
 }

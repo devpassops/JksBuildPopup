@@ -15,8 +15,8 @@ public class BuildPopupGlobalConfiguration extends GlobalConfiguration {
 
     private static final Logger LOGGER = Logger.getLogger(BuildPopupGlobalConfiguration.class.getName());
 
-    /** 全局是否启用插件功能 */
-    private boolean globallyEnabled;
+    /** 全局是否启用插件功能（默认 true） */
+    private boolean globallyEnabled = true;
 
     /** 线程池核心大小 */
     private int threadPoolCoreSize;
@@ -38,14 +38,14 @@ public class BuildPopupGlobalConfiguration extends GlobalConfiguration {
 
     public BuildPopupGlobalConfiguration() {
         load();
-        // 初始化默认值
+        // 初始化默认值（仅当未从配置文件加载时设置）
         if (threadPoolCoreSize <= 0) threadPoolCoreSize = 4;
         if (threadPoolMaxSize <= 0) threadPoolMaxSize = 16;
         if (threadPoolQueueCapacity <= 0) threadPoolQueueCapacity = 100;
         if (threadPoolKeepAliveSeconds <= 0) threadPoolKeepAliveSeconds = 60;
         if (globalScriptTimeout <= 0) globalScriptTimeout = 60;
         if (maxConcurrentPerJob <= 0) maxConcurrentPerJob = 2;
-        globallyEnabled = true;
+        // globallyEnabled 默认为 true（首次安装时），不覆盖用户已保存的配置
     }
 
     public boolean isGloballyEnabled() {
