@@ -152,6 +152,11 @@ public class BuildPopupService {
                     binding.setVariable("build", run);
                     binding.setVariable("currentBuild", run);
                 }
+                // Inject each parameter as a direct binding variable (like Active Choices plugin)
+                // so Groovy can use parameter names directly, e.g. DEPLOY_ENV instead of params.get('DEPLOY_ENV')
+                for (Map.Entry<String, String> entry : params.entrySet()) {
+                    binding.setVariable(entry.getKey(), entry.getValue());
+                }
 
                 GroovyShell shell = new GroovyShell(binding);
                 Object scriptResult = shell.evaluate(job.getProperty(BuildPopupJobProperty.class) instanceof BuildPopupJobProperty
