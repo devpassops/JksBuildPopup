@@ -119,8 +119,6 @@ public class BuildPopupWebAPI implements UnprotectedRootAction {
         }
         Map<String, String> envVars = new HashMap<>();
 
-        LOGGER.log(Level.INFO, "BuildPopup checking job {0} before build (form interception)", jobName);
-
         // 执行 Groovy 脚本
         BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(job, null, envVars, params);
 

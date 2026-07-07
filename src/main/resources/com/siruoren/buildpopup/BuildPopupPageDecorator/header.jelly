@@ -25,7 +25,6 @@
             var currentJobName = getJobNameFromUrl();
             if (!currentJobName) return;
 
-            console.log('[BuildPopup] Initialized for job:', currentJobName, 'apiBase:', apiBase);
 
             var isChecking = false;
             var _bpAllowBtn = false;
@@ -77,37 +76,44 @@
                 var btnContainer = document.createElement('div');
                 btnContainer.style.cssText = 'display:flex;justify-content:flex-end;gap:10px;';
 
-                // Cancel button - always shown when user can choose to proceed or not
-                var cancelBtn = document.createElement('button');
-                cancelBtn.style.cssText = 'background:#ccc;color:#333;border:none;padding:8px 20px;border-radius:4px;cursor:pointer;font-size:14px;';
-                cancelBtn.textContent = 'Cancel';
-                btnContainer.appendChild(cancelBtn);
+                // When blockBuild=true: only show Cancel (close) button, hide OK
+                if (!data.blockBuild) {
+                    var cancelBtn = document.createElement('button');
+                    cancelBtn.style.cssText = 'background:#ccc;color:#333;border:none;padding:8px 20px;border-radius:4px;cursor:pointer;font-size:14px;';
+                    cancelBtn.textContent = 'Cancel';
+                    btnContainer.appendChild(cancelBtn);
 
-                // OK / Confirm button
-                var confirmBtn = document.createElement('button');
-                if (data.blockBuild) {
-                    confirmBtn.style.cssText = 'background:#999;color:#fff;border:none;padding:8px 20px;border-radius:4px;cursor:pointer;font-size:14px;';
-                } else {
+                    var confirmBtn = document.createElement('button');
                     confirmBtn.style.cssText = 'background:#4a90d9;color:#fff;border:none;padding:8px 20px;border-radius:4px;cursor:pointer;font-size:14px;';
+                    confirmBtn.textContent = 'OK';
+                    btnContainer.appendChild(confirmBtn);
+
+                    // Confirm: proceed with build
+                    confirmBtn.onclick = function() {
+                        overlay.remove();
+                        if (onConfirm) onConfirm();
+                    };
+
+                    // Cancel: do not proceed
+                    cancelBtn.onclick = function() {
+                        overlay.remove();
+                        if (onCancel) onCancel();
+                    };
+                } else {
+                    // blockBuild: only close button
+                    var closeBtn = document.createElement('button');
+                    closeBtn.style.cssText = 'background:#ccc;color:#333;border:none;padding:8px 20px;border-radius:4px;cursor:pointer;font-size:14px;';
+                    closeBtn.textContent = 'OK';
+                    btnContainer.appendChild(closeBtn);
+
+                    closeBtn.onclick = function() {
+                        overlay.remove();
+                    };
                 }
-                confirmBtn.textContent = 'OK';
-                btnContainer.appendChild(confirmBtn);
 
                 modal.appendChild(btnContainer);
                 overlay.appendChild(modal);
                 document.body.appendChild(overlay);
-
-                // Confirm: proceed with build
-                confirmBtn.onclick = function() {
-                    overlay.remove();
-                    if (onConfirm) onConfirm();
-                };
-
-                // Cancel: do not proceed
-                cancelBtn.onclick = function() {
-                    overlay.remove();
-                    if (onCancel) onCancel();
-                };
 
                 // Click overlay backdrop = cancel (do not build)
                 overlay.onclick = function(e) {
@@ -157,7 +163,6 @@
                 if (formParams && Object.keys(formParams).length > 0) {
                     url += '&formParams=' + encodeURIComponent(JSON.stringify(formParams));
                 }
-                console.log('[BuildPopup] Checking:', url);
 
                 var xhr = new XMLHttpRequest();
                 xhr.open('GET', url, true);
@@ -167,13 +172,11 @@
                     if (xhr.readyState === 4) {
                         isChecking = false;
                         hideLoading();
-                        console.log('[BuildPopup] Response status:', xhr.status, 'body:', xhr.responseText);
                         if (xhr.status === 200) {
                             try {
                                 var data = JSON.parse(xhr.responseText);
-                                console.log('[BuildPopup] Check result:', data);
                                 if (data.blockBuild) {
-                                    // blockBuild: show popup, do NOT build regardless of OK/Cancel
+                                    // blockBuild: show popup with close button only, do NOT build
                                     showModal(data, null, null);
                                     callback(false);
                                 } else if (data.showPopup) {
@@ -187,11 +190,9 @@
                                     callback(true);
                                 }
                             } catch(e) {
-                                console.error('[BuildPopup] Parse error:', e);
                                 callback(true);
                             }
                         } else {
-                            console.warn('[BuildPopup] Check failed, status:', xhr.status);
                             callback(true);
                         }
                     }
@@ -199,16 +200,14 @@
                 xhr.onerror = function() {
                     isChecking = false;
                     hideLoading();
-                    console.error('[BuildPopup] XHR error');
                     callback(true);
                 };
                 xhr.send();
             }
 
-            // Trigger non-parameterized build via hidden form
+            // Trigger non-parameterized build via hidden form POST
             function triggerBuildPost(buildUrl) {
                 var crumbValue = getCrumb();
-                console.log('[BuildPopup] Triggering build POST:', buildUrl, 'crumb:', crumbValue ? 'found' : 'not found');
 
                 var form = document.createElement('form');
                 form.setAttribute('method', 'POST');
@@ -234,10 +233,8 @@
             }
 
             // Collect actual parameter values from the build form for Groovy check
-            // Only collects named inputs that look like Jenkins parameters
             function collectFormParams(form) {
                 var params = {};
-                // Look for Jenkins parameter rows: .repeated-chunk, .jenkins-parameters, or named inputs
                 var paramContainers = form.querySelectorAll('.repeated-chunk, .jenkins-parameters');
                 if (paramContainers.length > 0) {
                     for (var c = 0; c < paramContainers.length; c++) {
@@ -257,7 +254,6 @@
                         }
                     }
                 } else {
-                    // Fallback: collect visible named inputs
                     var allInputs = form.querySelectorAll('input, select, textarea');
                     for (var i = 0; i < allInputs.length; i++) {
                         var input = allInputs[i];
@@ -276,25 +272,48 @@
                 return params;
             }
 
-            // Check if element is the non-parameterized "Build Now" link
+            // Check if a link is the non-parameterized "Build Now" sidebar link
+            // For free-style jobs without parameters, Jenkins sidebar shows "Build Now" with href="build"
+            // For parameterized jobs, it shows "Build with Parameters" with href="buildWithParameters"
             function isBuildNowLink(el) {
                 if (!el || el.tagName !== 'A') return false;
                 var href = el.getAttribute('href') || '';
-                // Only match "build" (not "buildWithParameters")
+                var text = (el.textContent || el.innerText || '').trim();
+                
+                
+                // Must not be buildWithParameters
+                if (href.indexOf('buildWithParameters') >= 0) return false;
+                
+                // Must not be "Build with Parameters" text
+                if (text === 'Build with Parameters' || text === '使用参数构建') return false;
+                
+                // Match sidebar "Build Now" links by href patterns
                 if (href === 'build' || href === './build') return true;
                 if (href.indexOf('build?delay=') === 0 || href.indexOf('./build?delay=') === 0) return true;
-                if (el.classList && el.classList.contains('task-link')) {
-                    if (href === 'build' || href.indexOf('build?delay=') === 0 ||
-                        href === './build' || href.indexOf('./build?delay=') === 0) return true;
+                if (href.match(/^\/.*\/build$/) || href.match(/^\/.*\/build\?delay=/)) return true;
+                
+                // Match by text content (中文: 立即构建, English: Build Now)
+                if (text === '立即构建' || text === 'Build Now') {
+                    if (href.indexOf('build') >= 0 && href.indexOf('buildWithParameters') < 0) {
+                        return true;
+                    }
                 }
+                
+                // Also match via task-link class for sidebar links
+                if (el.classList && el.classList.contains('task-link')) {
+                    if (href.indexOf('build') === 0 || href.indexOf('./build') === 0 || href.indexOf('/build') >= 0) {
+                        if (href.indexOf('buildWithParameters') < 0) return true;
+                    }
+                }
+                
                 return false;
             }
 
-            // Only intercept non-parameterized "Build Now" link clicks
-            // "Build with Parameters" links navigate directly to the params page
+            // Intercept "Build Now" link clicks in sidebar (non-parameterized jobs)
             document.addEventListener('click', function(e) {
                 var el = e.target;
                 var link = null;
+                // Walk up to find the anchor tag
                 while (el && el !== document) {
                     if (isBuildNowLink(el)) {
                         link = el;
@@ -308,7 +327,6 @@
                 e.stopPropagation();
                 e.stopImmediatePropagation();
 
-                console.log('[BuildPopup] Intercepted Build Now click, href:', link.href);
 
                 checkBeforeBuild(function(allow) {
                     if (allow) {
@@ -338,7 +356,6 @@
                                 btn.addEventListener('click', function(e) {
                                     if (_bpAllowBtn) {
                                         _bpAllowBtn = false;
-                                        console.log('[BuildPopup] Allowing form button click through');
                                         return;
                                     }
 
@@ -346,14 +363,11 @@
                                     e.stopPropagation();
                                     e.stopImmediatePropagation();
 
-                                    console.log('[BuildPopup] Intercepted build form button click');
 
-                                    // Collect actual parameter values filled by user for Groovy check
                                     var formParams = collectFormParams(form);
 
                                     checkBeforeBuild(function(allow) {
                                         if (allow) {
-                                            // Let the native Jenkins handler submit the form
                                             _bpAllowBtn = true;
                                             btn.click();
                                         }
@@ -367,7 +381,8 @@
 
             function init() {
                 interceptBuildForms();
-                console.log('[BuildPopup] Form interception initialized for job:', currentJobName);
+                // Debug: log all sidebar links for troubleshooting
+                console.log('[BuildPopup] Initialization complete for job:', currentJobName);
             }
 
             if (document.readyState === 'loading') {
@@ -376,6 +391,7 @@
                 init();
             }
 
+            // Re-intercept forms after delayed rendering
             setTimeout(interceptBuildForms, 1000);
             setTimeout(interceptBuildForms, 3000);
         })();
