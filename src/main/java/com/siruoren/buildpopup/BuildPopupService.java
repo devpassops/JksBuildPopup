@@ -5,6 +5,9 @@ import groovy.lang.GroovyShell;
 import hudson.model.Job;
 import hudson.model.Run;
 import jenkins.model.Jenkins;
+import org.jenkinsci.plugins.scriptsecurity.sandbox.RejectedAccessException;
+import org.jenkinsci.plugins.scriptsecurity.sandbox.whitelists.Whitelisted;
+import org.jenkinsci.plugins.scriptsecurity.sandbox.groovy.GroovySandbox;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -73,6 +76,8 @@ public class BuildPopupService {
 
         String jobName = job.getFullName();
         String groovyScript = prop.getGroovyScript();
+        boolean useSandbox = prop.isUseSandbox();
+        
         if (groovyScript == null || groovyScript.trim().isEmpty()) {
             return BuildPopupResult.success(false, false, "");
         }
@@ -93,7 +98,7 @@ public class BuildPopupService {
             }
 
             Future<BuildPopupResult> future = BuildPopupThreadPool.getInstance().submit(
-                new GroovyExecutionTask(job, run, envVars, params)
+                new GroovyExecutionTask(job, run, envVars, params, groovyScript, useSandbox)
             );
 
             try {
@@ -129,14 +134,20 @@ public class BuildPopupService {
         private final Run<?, ?> run;
         private final Map<String, String> envVars;
         private final Map<String, String> params;
+        private final String groovyScript;
+        private final boolean useSandbox;
 
         GroovyExecutionTask(Job<?, ?> job, Run<?, ?> run,
                             Map<String, String> envVars,
-                            Map<String, String> params) {
+                            Map<String, String> params,
+                            String groovyScript,
+                            boolean useSandbox) {
             this.job = job;
             this.run = run;
             this.envVars = envVars != null ? envVars : new HashMap<>();
             this.params = params != null ? params : new HashMap<>();
+            this.groovyScript = groovyScript;
+            this.useSandbox = useSandbox;
         }
 
         @Override
@@ -158,9 +169,26 @@ public class BuildPopupService {
                     binding.setVariable(entry.getKey(), entry.getValue());
                 }
 
-                GroovyShell shell = new GroovyShell(binding);
-                Object scriptResult = shell.evaluate(job.getProperty(BuildPopupJobProperty.class) instanceof BuildPopupJobProperty
-                    ? ((BuildPopupJobProperty) job.getProperty(BuildPopupJobProperty.class)).getGroovyScript() : "");
+                GroovyShell shell;
+                Object scriptResult;
+                
+                if (useSandbox) {
+                    // Use Groovy Sandbox for security
+                    try {
+                        shell = new GroovyShell(binding);
+                        scriptResult = GroovySandbox.run(shell, groovyScript, null);
+                    } catch (RejectedAccessException e) {
+                        long executionTime = System.currentTimeMillis() - startTime;
+                        LOGGER.log(Level.WARNING, "Groovy script rejected by sandbox for job " + job.getFullName() + ": " + e.getMessage());
+                        BuildPopupResult result = BuildPopupResult.error("Script rejected by sandbox: " + e.getMessage());
+                        result.setExecutionTimeMs(executionTime);
+                        return result;
+                    }
+                } else {
+                    // Execute without sandbox (full access)
+                    shell = new GroovyShell(binding);
+                    scriptResult = shell.evaluate(groovyScript);
+                }
 
                 long executionTime = System.currentTimeMillis() - startTime;
                 return parseScriptResult(scriptResult, executionTime);

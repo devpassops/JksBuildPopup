@@ -9,5 +9,9 @@
             <f:number name="scriptTimeout" value="${instance.scriptTimeout}"
                       default="${descriptor.defaultScriptTimeout}" min="1" max="300"/>
         </f:entry>
+
+        <f:entry title="${%useSandboxTitle}" description="${%useSandboxDescription}">
+            <f:checkbox name="useSandbox" checked="${instance.useSandbox}" default="false"/>
+        </f:entry>
     </f:optionalBlock>
 </j:jelly>

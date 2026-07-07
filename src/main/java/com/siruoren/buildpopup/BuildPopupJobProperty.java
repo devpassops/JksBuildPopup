@@ -36,11 +36,15 @@ public class BuildPopupJobProperty extends JobProperty<Job<?, ?>> {
     /** Groovy 脚本执行超时时间（秒），默认 30 */
     private int scriptTimeout;
 
+    /** 是否在沙箱中执行 Groovy 脚本，默认 false */
+    private boolean useSandbox;
+
     @DataBoundConstructor
     public BuildPopupJobProperty(boolean enabled) {
         this.enabled = enabled;
         this.groovyScript = "";
         this.scriptTimeout = 30;
+        this.useSandbox = false;
     }
 
     @DataBoundSetter
@@ -68,6 +72,15 @@ public class BuildPopupJobProperty extends JobProperty<Job<?, ?>> {
     @DataBoundSetter
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    @DataBoundSetter
+    public void setUseSandbox(boolean useSandbox) {
+        this.useSandbox = useSandbox;
+    }
+
+    public boolean isUseSandbox() {
+        return useSandbox;
     }
 
     @Extension
