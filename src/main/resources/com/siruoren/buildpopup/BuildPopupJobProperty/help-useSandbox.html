@@ -1,0 +1,32 @@
+<div>
+  <p>
+    When enabled, the Groovy script will be executed in a Jenkins Script Security sandbox.
+    This restricts access to potentially dangerous operations for security.
+  </p>
+  <p>
+    <b>What the sandbox restricts:</b>
+  </p>
+  <ul>
+    <li>File system access (reading/writing files)</li>
+    <li>Network operations (HTTP requests, sockets)</li>
+    <li>Process execution (running external commands)</li>
+    <li>Direct access to Jenkins internal APIs</li>
+  </ul>
+  <p>
+    <b>What is allowed in sandbox:</b>
+  </p>
+  <ul>
+    <li>Access to job, build, and parameter information</li>
+    <li>String manipulation and basic Groovy operations</li>
+    <li>Approved method calls (whitelisted by administrators)</li>
+  </ul>
+  <p>
+    <b>Recommendation:</b> Enable this option unless you trust the script authors and need
+    access to restricted operations. Scripts that require restricted operations will fail
+    with a clear error message indicating which method was rejected.
+  </p>
+  <p>
+    Administrators can approve specific method calls through Jenkins → Script Console
+    or by configuring script approval in the system configuration.
+  </p>
+</div>

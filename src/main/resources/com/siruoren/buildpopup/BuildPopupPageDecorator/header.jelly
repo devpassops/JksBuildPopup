@@ -1,0 +1,395 @@
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+    <st:once>
+    <script>
+    //<![CDATA[
+        (function() {
+            var _bpRootURL = '';
+            try { _bpRootURL = (typeof rootURL !== 'undefined' && rootURL) ? rootURL : ''; } catch(e) {}
+            var apiBase = _bpRootURL + '/build-popup-api';
+
+            function getJobNameFromUrl() {
+                var path = window.location.pathname;
+                if (_bpRootURL && path.indexOf(_bpRootURL) === 0) {
+                    path = path.substring(_bpRootURL.length);
+                }
+                var parts = path.split('/');
+                var jobParts = [];
+                for (var i = 0; i < parts.length - 1; i++) {
+                    if (parts[i] === 'job' && parts[i + 1]) {
+                        jobParts.push(parts[i + 1]);
+                    }
+                }
+                return jobParts.join('/');
+            }
+
+            var currentJobName = getJobNameFromUrl();
+            if (!currentJobName) return;
+
+
+            var isChecking = false;
+            var _bpAllowBtn = false;
+
+            function showModal(data, onConfirm, onCancel) {
+                var existing = document.getElementById('build-popup-overlay');
+                if (existing) existing.remove();
+
+                var overlay = document.createElement('div');
+                overlay.id = 'build-popup-overlay';
+                overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+
+                var modal = document.createElement('div');
+                modal.style.cssText = 'background:#fff;border-radius:8px;padding:24px;max-width:600px;width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.3);position:relative;';
+
+                var borderColor, bgColor, icon;
+                if (data.error) {
+                    borderColor = '#d33'; bgColor = '#fff3f3'; icon = '\u26A0';
+                } else if (data.blockBuild) {
+                    borderColor = '#d33'; bgColor = '#fff3f3'; icon = '\u2716';
+                } else {
+                    borderColor = '#0a0'; bgColor = '#f0fff0'; icon = '\u2713';
+                }
+
+                var contentDiv = document.createElement('div');
+                contentDiv.style.cssText = 'border-left:4px solid ' + borderColor + ';padding:12px 16px;background:' + bgColor + ';margin-bottom:16px;border-radius:4px;';
+
+                var titleText = data.popupTitle || (data.error ? 'Script Error' : (data.blockBuild ? 'Build Blocked' : 'Build Notification'));
+
+                var h3 = document.createElement('h3');
+                h3.style.cssText = 'margin:0 0 8px 0;color:' + borderColor + ';';
+                h3.textContent = icon + ' ' + titleText;
+
+                var msgDiv = document.createElement('div');
+                msgDiv.style.cssText = 'white-space:pre-wrap;margin:0;';
+                msgDiv.textContent = data.error ? (data.errorMessage || 'Unknown error') : (data.popupContent || '');
+                if (data.error) msgDiv.style.color = '#d33';
+
+                contentDiv.appendChild(h3);
+                contentDiv.appendChild(msgDiv);
+                modal.appendChild(contentDiv);
+
+                var timeP = document.createElement('p');
+                timeP.style.cssText = 'color:#888;font-size:12px;margin:8px 0 16px 0;';
+                timeP.textContent = 'Execution: ' + (data.executionTimeMs || 0) + 'ms';
+                modal.appendChild(timeP);
+
+                // Button container
+                var btnContainer = document.createElement('div');
+                btnContainer.style.cssText = 'display:flex;justify-content:flex-end;gap:10px;';
+
+                // When blockBuild=true: only show Cancel (close) button, hide OK
+                if (!data.blockBuild) {
+                    var cancelBtn = document.createElement('button');
+                    cancelBtn.style.cssText = 'background:#ccc;color:#333;border:none;padding:8px 20px;border-radius:4px;cursor:pointer;font-size:14px;';
+                    cancelBtn.textContent = 'Cancel';
+                    btnContainer.appendChild(cancelBtn);
+
+                    var confirmBtn = document.createElement('button');
+                    confirmBtn.style.cssText = 'background:#4a90d9;color:#fff;border:none;padding:8px 20px;border-radius:4px;cursor:pointer;font-size:14px;';
+                    confirmBtn.textContent = 'OK';
+                    btnContainer.appendChild(confirmBtn);
+
+                    // Confirm: proceed with build
+                    confirmBtn.onclick = function() {
+                        overlay.remove();
+                        if (onConfirm) onConfirm();
+                    };
+
+                    // Cancel: do not proceed
+                    cancelBtn.onclick = function() {
+                        overlay.remove();
+                        if (onCancel) onCancel();
+                    };
+                } else {
+                    // blockBuild: only close button
+                    var closeBtn = document.createElement('button');
+                    closeBtn.style.cssText = 'background:#ccc;color:#333;border:none;padding:8px 20px;border-radius:4px;cursor:pointer;font-size:14px;';
+                    closeBtn.textContent = 'OK';
+                    btnContainer.appendChild(closeBtn);
+
+                    closeBtn.onclick = function() {
+                        overlay.remove();
+                    };
+                }
+
+                modal.appendChild(btnContainer);
+                overlay.appendChild(modal);
+                document.body.appendChild(overlay);
+
+                // Click overlay backdrop = cancel (do not build)
+                overlay.onclick = function(e) {
+                    if (e.target === overlay) {
+                        overlay.remove();
+                        if (onCancel) onCancel();
+                    }
+                };
+            }
+
+            function showLoading() {
+                var existing = document.getElementById('build-popup-loading');
+                if (existing) return;
+                var loading = document.createElement('div');
+                loading.id = 'build-popup-loading';
+                loading.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.3);z-index:9999;display:flex;align-items:center;justify-content:center;';
+
+                var inner = document.createElement('div');
+                inner.style.cssText = 'background:#fff;padding:20px 32px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,0.2);font-size:14px;';
+                inner.textContent = 'Checking build conditions...';
+
+                loading.appendChild(inner);
+                document.body.appendChild(loading);
+            }
+
+            function hideLoading() {
+                var loading = document.getElementById('build-popup-loading');
+                if (loading) loading.remove();
+            }
+
+            function getCrumb() {
+                var meta = document.querySelector('meta[name="crumb"]');
+                if (meta && meta.content) return meta.content;
+                var crumbInput = document.querySelector('input[name="Jenkins-Crumb"]');
+                if (crumbInput && crumbInput.value) return crumbInput.value;
+                try { if (typeof crumb !== 'undefined' && crumb) return crumb; } catch(e) {}
+                return '';
+            }
+
+            // Check before build, optionally with actual form parameter values
+            function checkBeforeBuild(callback, formParams) {
+                if (isChecking) return;
+                isChecking = true;
+                showLoading();
+
+                var url = apiBase + '/check?job=' + encodeURIComponent(currentJobName);
+                if (formParams && Object.keys(formParams).length > 0) {
+                    url += '&formParams=' + encodeURIComponent(JSON.stringify(formParams));
+                }
+
+                var xhr = new XMLHttpRequest();
+                xhr.open('GET', url, true);
+                xhr.overrideMimeType('application/json;charset=UTF-8');
+                xhr.setRequestHeader('Accept', 'application/json;charset=UTF-8');
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        isChecking = false;
+                        hideLoading();
+                        if (xhr.status === 200) {
+                            try {
+                                var data = JSON.parse(xhr.responseText);
+                                if (data.blockBuild) {
+                                    // blockBuild: show popup with close button only, do NOT build
+                                    showModal(data, null, null);
+                                    callback(false);
+                                } else if (data.showPopup) {
+                                    // showPopup but not blockBuild: OK=build, Cancel=no build
+                                    showModal(data, function() {
+                                        callback(true);
+                                    }, function() {
+                                        callback(false);
+                                    });
+                                } else {
+                                    callback(true);
+                                }
+                            } catch(e) {
+                                callback(true);
+                            }
+                        } else {
+                            callback(true);
+                        }
+                    }
+                };
+                xhr.onerror = function() {
+                    isChecking = false;
+                    hideLoading();
+                    callback(true);
+                };
+                xhr.send();
+            }
+
+            // Trigger non-parameterized build via direct navigation
+            function triggerBuildPost(buildUrl) {
+                var crumbValue = getCrumb();
+                
+                // Use fetch to trigger build with POST, then redirect to job page
+                fetch(buildUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Jenkins-Crumb': crumbValue || ''
+                    },
+                    body: 'json={}'
+                }).then(function(response) {
+                    // After triggering build, redirect to job page
+                    window.location.href = window.location.pathname;
+                }).catch(function(error) {
+                    // On error, still redirect to job page
+                    window.location.href = window.location.pathname;
+                });
+            }
+
+            // Collect actual parameter values from the build form for Groovy check
+            function collectFormParams(form) {
+                var params = {};
+                var paramContainers = form.querySelectorAll('.repeated-chunk, .jenkins-parameters');
+                if (paramContainers.length > 0) {
+                    for (var c = 0; c < paramContainers.length; c++) {
+                        var inputs = paramContainers[c].querySelectorAll('input, select, textarea');
+                        for (var i = 0; i < inputs.length; i++) {
+                            var input = inputs[i];
+                            var name = input.name;
+                            if (!name || name === 'json' || name === 'Jenkins-Crumb' || name === 'Submit' || name === '.reachable') continue;
+                            if (input.type === 'hidden') continue;
+                            if (input.type === 'checkbox' || input.type === 'radio') {
+                                if (input.checked) params[name] = input.value;
+                            } else if (input.type !== 'file') {
+                                if (input.value !== undefined && input.value !== null) {
+                                    params[name] = input.value;
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    var allInputs = form.querySelectorAll('input, select, textarea');
+                    for (var i = 0; i < allInputs.length; i++) {
+                        var input = allInputs[i];
+                        var name = input.name;
+                        if (!name || name === 'json' || name === 'Jenkins-Crumb' || name === 'Submit' || name === '.reachable' || name === 'value') continue;
+                        if (input.type === 'hidden') continue;
+                        if (input.type === 'checkbox' || input.type === 'radio') {
+                            if (input.checked) params[name] = input.value;
+                        } else if (input.type !== 'file') {
+                            if (input.value !== undefined && input.value !== null) {
+                                params[name] = input.value;
+                            }
+                        }
+                    }
+                }
+                return params;
+            }
+
+            // Check if a link is the non-parameterized "Build Now" sidebar link
+            // For free-style jobs without parameters, Jenkins sidebar shows "Build Now" with href="build"
+            // For parameterized jobs, it shows "Build with Parameters" with href="buildWithParameters"
+            function isBuildNowLink(el) {
+                if (!el || el.tagName !== 'A') return false;
+                var href = el.getAttribute('href') || '';
+                var text = (el.textContent || el.innerText || '').trim();
+                
+                
+                // Must not be buildWithParameters
+                if (href.indexOf('buildWithParameters') >= 0) return false;
+                
+                // Must not be "Build with Parameters" text
+                if (text === 'Build with Parameters' || text === '使用参数构建') return false;
+                
+                // Match sidebar "Build Now" links by href patterns
+                if (href === 'build' || href === './build') return true;
+                if (href.indexOf('build?delay=') === 0 || href.indexOf('./build?delay=') === 0) return true;
+                if (href.match(/^\/.*\/build$/) || href.match(/^\/.*\/build\?delay=/)) return true;
+                
+                // Match by text content (中文: 立即构建, English: Build Now)
+                if (text === '立即构建' || text === 'Build Now') {
+                    if (href.indexOf('build') >= 0 && href.indexOf('buildWithParameters') < 0) {
+                        return true;
+                    }
+                }
+                
+                // Also match via task-link class for sidebar links
+                if (el.classList && el.classList.contains('task-link')) {
+                    if (href.indexOf('build') === 0 || href.indexOf('./build') === 0 || href.indexOf('/build') >= 0) {
+                        if (href.indexOf('buildWithParameters') < 0) return true;
+                    }
+                }
+                
+                return false;
+            }
+
+            // Intercept "Build Now" link clicks in sidebar (non-parameterized jobs)
+            document.addEventListener('click', function(e) {
+                var el = e.target;
+                var link = null;
+                // Walk up to find the anchor tag
+                while (el && el !== document) {
+                    if (isBuildNowLink(el)) {
+                        link = el;
+                        break;
+                    }
+                    el = el.parentElement;
+                }
+                if (!link) return;
+
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+
+
+                checkBeforeBuild(function(allow) {
+                    if (allow) {
+                        triggerBuildPost(link.href);
+                    }
+                });
+            }, true);
+
+            // Intercept Build button clicks on parameter forms
+            // The check runs AFTER user fills in parameters, with actual parameter values
+            // After check passes, let Jenkins native form handler submit (via _bpAllowBtn flag)
+            function interceptBuildForms() {
+                var forms = document.querySelectorAll('form');
+                for (var i = 0; i < forms.length; i++) {
+                    (function(form) {
+                        if (form.getAttribute('data-buildpopup-intercepted')) return;
+                        var action = form.getAttribute('action') || '';
+                        if (action.indexOf('build') < 0) return;
+                        if (action.indexOf('buildWithParameters') < 0 &&
+                            action !== 'build' && action.indexOf('build?') !== 0) return;
+
+                        form.setAttribute('data-buildpopup-intercepted', 'true');
+
+                        var submitBtns = form.querySelectorAll('button, input[type="submit"], .yui-submit-button');
+                        for (var j = 0; j < submitBtns.length; j++) {
+                            (function(btn) {
+                                btn.addEventListener('click', function(e) {
+                                    if (_bpAllowBtn) {
+                                        _bpAllowBtn = false;
+                                        return;
+                                    }
+
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    e.stopImmediatePropagation();
+
+
+                                    var formParams = collectFormParams(form);
+
+                                    checkBeforeBuild(function(allow) {
+                                        if (allow) {
+                                            _bpAllowBtn = true;
+                                            btn.click();
+                                        }
+                                    }, formParams);
+                                }, true);
+                            })(submitBtns[j]);
+                        }
+                    })(forms[i]);
+                }
+            }
+
+            function init() {
+                interceptBuildForms();
+                // Debug: log all sidebar links for troubleshooting
+                console.log('[BuildPopup] Initialization complete for job:', currentJobName);
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', init);
+            } else {
+                init();
+            }
+
+            // Re-intercept forms after delayed rendering
+            setTimeout(interceptBuildForms, 1000);
+            setTimeout(interceptBuildForms, 3000);
+        })();
+    //]]>
+    </script>
+    </st:once>
+</j:jelly>
