@@ -5,15 +5,15 @@
         </f:entry>
 
         <f:entry title="${%threadPoolCoreSizeTitle}" description="${%threadPoolCoreSizeDescription}">
-            <f:number name="threadPoolCoreSize" value="${instance.threadPoolCoreSize}" default="4" min="1" max="32"/>
+            <f:number name="threadPoolCoreSize" value="${instance.threadPoolCoreSize}" default="${instance.autoCoreSize}" min="1" max="128"/>
         </f:entry>
 
         <f:entry title="${%threadPoolMaxSizeTitle}" description="${%threadPoolMaxSizeDescription}">
-            <f:number name="threadPoolMaxSize" value="${instance.threadPoolMaxSize}" default="16" min="1" max="64"/>
+            <f:number name="threadPoolMaxSize" value="${instance.threadPoolMaxSize}" default="${instance.autoMaxSize}" min="1" max="256"/>
         </f:entry>
 
         <f:entry title="${%threadPoolQueueCapacityTitle}" description="${%threadPoolQueueCapacityDescription}">
-            <f:number name="threadPoolQueueCapacity" value="${instance.threadPoolQueueCapacity}" default="100" min="10" max="1000"/>
+            <f:number name="threadPoolQueueCapacity" value="${instance.threadPoolQueueCapacity}" default="${instance.autoQueueCapacity}" min="10" max="5000"/>
         </f:entry>
 
         <f:entry title="${%threadPoolKeepAliveTitle}" description="${%threadPoolKeepAliveDescription}">
@@ -25,7 +25,7 @@
         </f:entry>
 
         <f:entry title="${%maxConcurrentPerJobTitle}" description="${%maxConcurrentPerJobDescription}">
-            <f:number name="maxConcurrentPerJob" value="${instance.maxConcurrentPerJob}" default="2" min="1" max="10"/>
+            <f:number name="maxConcurrentPerJob" value="${instance.maxConcurrentPerJob}" default="20" min="1" max="100"/>
         </f:entry>
     </f:section>
 </j:jelly>
