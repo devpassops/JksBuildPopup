@@ -147,6 +147,20 @@ public class BuildPopupWebAPI implements UnprotectedRootAction {
             return;
         }
 
+        // Security: Check job read permission
+        jenkins.model.Jenkins j = jenkins.model.Jenkins.getInstanceOrNull();
+        if (j != null) {
+            Item item = j.getItemByFullName(jobName);
+            if (item instanceof Job) {
+                try {
+                    ((Job<?, ?>) item).checkPermission(Item.READ);
+                } catch (Exception e) {
+                    rsp.sendError(HttpServletResponse.SC_FORBIDDEN, "No permission to access job: " + jobName);
+                    return;
+                }
+            }
+        }
+
         BuildPopupResult result = BuildPopupAction.getLatestPopupResult(jobName);
 
         rsp.setContentType("application/json;charset=UTF-8");
@@ -179,6 +193,20 @@ public class BuildPopupWebAPI implements UnprotectedRootAction {
         if (jobName == null || jobName.isEmpty()) {
             rsp.sendError(HttpServletResponse.SC_BAD_REQUEST, "Missing 'job' parameter");
             return;
+        }
+
+        // Security: Check job read permission
+        jenkins.model.Jenkins j = jenkins.model.Jenkins.getInstanceOrNull();
+        if (j != null) {
+            Item item = j.getItemByFullName(jobName);
+            if (item instanceof Job) {
+                try {
+                    ((Job<?, ?>) item).checkPermission(Item.READ);
+                } catch (Exception e) {
+                    rsp.sendError(HttpServletResponse.SC_FORBIDDEN, "No permission to access job: " + jobName);
+                    return;
+                }
+            }
         }
 
         BuildPopupAction.dismissPopup(jobName, popupId);

@@ -1,0 +1,40 @@
+<div>
+  <p>
+    Groovy script executed before each build. The script has access to the following bindings:
+  </p>
+  <ul>
+    <li><code>job</code> - The current Jenkins job</li>
+    <li><code>jenkins</code> - The Jenkins instance</li>
+    <li><code>env</code> - Environment variables map</li>
+    <li><code>params</code> - Build parameters map</li>
+    <li><code>build</code> / <code>currentBuild</code> - The current build (if available)</li>
+  </ul>
+  <p>
+    Build parameters are also available as direct variables. For example, if you have a parameter named <code>DEPLOY_ENV</code>,
+    you can access it as <code>DEPLOY_ENV</code> or <code>params.get('DEPLOY_ENV')</code>.
+  </p>
+  <p>
+    The script <b>must</b> return a Map with the following keys:
+  </p>
+  <ul>
+    <li><code>blockBuild</code> (Boolean, default: false) - If true, block the build and only show the popup</li>
+    <li><code>showPopup</code> (Boolean, default: false) - If true, show a popup notification</li>
+    <li><code>popupContent</code> (String) - The message to display in the popup</li>
+    <li><code>popupTitle</code> (String, default: "Build Notification") - The title of the popup</li>
+  </ul>
+  <p>
+    <b>Example:</b>
+  </p>
+  <pre>
+if (job.isBuilding()) {
+    return [blockBuild: true, showPopup: true, 
+            popupContent: "Job ${job.name} is already building!", 
+            popupTitle: "Build Warning"]
+} else {
+    return [blockBuild: false, showPopup: false, popupContent: '']
+}
+  </pre>
+  <p>
+    <b>Note:</b> Use map literal syntax <code>[key: value]</code>, not method calls like <code>popupContent('xxx')</code>.
+  </p>
+</div>
