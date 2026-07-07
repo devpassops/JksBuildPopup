@@ -1,0 +1,40 @@
+<div>
+  <p>
+    在每次构建前执行的 Groovy 脚本。脚本可以访问以下绑定变量：
+  </p>
+  <ul>
+    <li><code>job</code> - 当前 Jenkins 任务</li>
+    <li><code>jenkins</code> - Jenkins 实例</li>
+    <li><code>env</code> - 环境变量映射</li>
+    <li><code>params</code> - 构建参数映射</li>
+    <li><code>build</code> / <code>currentBuild</code> - 当前构建（如果可用）</li>
+  </ul>
+  <p>
+    构建参数也可以作为直接变量使用。例如，如果有一个名为 <code>DEPLOY_ENV</code> 的参数，
+    可以通过 <code>DEPLOY_ENV</code> 或 <code>params.get('DEPLOY_ENV')</code> 访问。
+  </p>
+  <p>
+    脚本<b>必须</b>返回一个包含以下键的 Map：
+  </p>
+  <ul>
+    <li><code>blockBuild</code>（布尔值，默认：false）- 如果为 true，阻止构建并仅显示弹窗</li>
+    <li><code>showPopup</code>（布尔值，默认：false）- 如果为 true，显示弹窗通知</li>
+    <li><code>popupContent</code>（字符串）- 在弹窗中显示的消息</li>
+    <li><code>popupTitle</code>（字符串，默认："Build Notification"）- 弹窗标题</li>
+  </ul>
+  <p>
+    <b>示例：</b>
+  </p>
+  <pre>
+if (job.isBuilding()) {
+    return [blockBuild: true, showPopup: true,
+            popupContent: "任务 ${job.name} 正在构建中！",
+            popupTitle: "构建警告"]
+} else {
+    return [blockBuild: false, showPopup: false, popupContent: '']
+}
+  </pre>
+  <p>
+    <b>注意：</b>请使用 Map 字面量语法 <code>[key: value]</code>，而不是方法调用如 <code>popupContent('xxx')</code>。
+  </p>
+</div>

@@ -11,7 +11,7 @@
         </f:entry>
 
         <f:entry title="${%useSandboxTitle}" description="${%useSandboxDescription}">
-            <f:checkbox name="useSandbox" checked="${instance.useSandbox}" default="false"/>
+            <f:checkbox name="useSandbox" checked="${instance.useSandbox}" default="true"/>
         </f:entry>
     </f:optionalBlock>
 </j:jelly>

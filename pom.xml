@@ -11,7 +11,7 @@
 
     <groupId>com.siruoren</groupId>
     <artifactId>build-popup</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0</version>
     <packaging>hpi</packaging>
 
     <name>Build Popup Plugin</name>
@@ -70,7 +70,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                     <excludes>
-                        <exclude>com.siruoren.build_popup.InjectedTest</exclude>
+                        <exclude>InjectedTest</exclude>
                     </excludes>
                 </configuration>
             </plugin>

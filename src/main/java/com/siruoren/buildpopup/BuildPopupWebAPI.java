@@ -71,11 +71,11 @@ public class BuildPopupWebAPI implements UnprotectedRootAction {
 
         Job<?, ?> job = (Job<?, ?>) item;
 
-        // 权限检查：需要 Job.READ 权限
+        // 权限检查：需要 Job.BUILD 权限（构建前检查，调用者应有构建权限）
         try {
-            job.checkPermission(Item.READ);
+            job.checkPermission(Item.BUILD);
         } catch (Exception e) {
-            rsp.sendError(HttpServletResponse.SC_FORBIDDEN, "No permission to access job: " + jobName);
+            rsp.sendError(HttpServletResponse.SC_FORBIDDEN, "No permission to build job: " + jobName);
             return;
         }
 
