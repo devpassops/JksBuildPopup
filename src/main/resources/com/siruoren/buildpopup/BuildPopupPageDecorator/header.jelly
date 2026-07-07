@@ -30,7 +30,7 @@
             var isChecking = false;
             var _bpAllowBtn = false;
 
-            function showModal(data, onDismiss) {
+            function showModal(data, onConfirm, onCancel) {
                 var existing = document.getElementById('build-popup-overlay');
                 if (existing) existing.remove();
 
@@ -73,23 +73,47 @@
                 timeP.textContent = 'Execution: ' + (data.executionTimeMs || 0) + 'ms';
                 modal.appendChild(timeP);
 
-                var btn = document.createElement('button');
-                btn.style.cssText = 'background:#4a90d9;color:#fff;border:none;padding:8px 20px;border-radius:4px;cursor:pointer;font-size:14px;';
-                btn.textContent = 'OK';
-                modal.appendChild(btn);
+                // Button container
+                var btnContainer = document.createElement('div');
+                btnContainer.style.cssText = 'display:flex;justify-content:flex-end;gap:10px;';
 
+                // Cancel button - always shown when user can choose to proceed or not
+                var cancelBtn = document.createElement('button');
+                cancelBtn.style.cssText = 'background:#ccc;color:#333;border:none;padding:8px 20px;border-radius:4px;cursor:pointer;font-size:14px;';
+                cancelBtn.textContent = 'Cancel';
+                btnContainer.appendChild(cancelBtn);
+
+                // OK / Confirm button
+                var confirmBtn = document.createElement('button');
+                if (data.blockBuild) {
+                    confirmBtn.style.cssText = 'background:#999;color:#fff;border:none;padding:8px 20px;border-radius:4px;cursor:pointer;font-size:14px;';
+                } else {
+                    confirmBtn.style.cssText = 'background:#4a90d9;color:#fff;border:none;padding:8px 20px;border-radius:4px;cursor:pointer;font-size:14px;';
+                }
+                confirmBtn.textContent = 'OK';
+                btnContainer.appendChild(confirmBtn);
+
+                modal.appendChild(btnContainer);
                 overlay.appendChild(modal);
                 document.body.appendChild(overlay);
 
-                btn.onclick = function() {
+                // Confirm: proceed with build
+                confirmBtn.onclick = function() {
                     overlay.remove();
-                    if (onDismiss) onDismiss();
+                    if (onConfirm) onConfirm();
                 };
 
+                // Cancel: do not proceed
+                cancelBtn.onclick = function() {
+                    overlay.remove();
+                    if (onCancel) onCancel();
+                };
+
+                // Click overlay backdrop = cancel (do not build)
                 overlay.onclick = function(e) {
                     if (e.target === overlay) {
                         overlay.remove();
-                        if (onDismiss) onDismiss();
+                        if (onCancel) onCancel();
                     }
                 };
             }
@@ -137,7 +161,8 @@
 
                 var xhr = new XMLHttpRequest();
                 xhr.open('GET', url, true);
-                xhr.setRequestHeader('Accept', 'application/json');
+                xhr.overrideMimeType('application/json;charset=UTF-8');
+                xhr.setRequestHeader('Accept', 'application/json;charset=UTF-8');
                 xhr.onreadystatechange = function() {
                     if (xhr.readyState === 4) {
                         isChecking = false;
@@ -148,11 +173,15 @@
                                 var data = JSON.parse(xhr.responseText);
                                 console.log('[BuildPopup] Check result:', data);
                                 if (data.blockBuild) {
-                                    showModal(data, null);
+                                    // blockBuild: show popup, do NOT build regardless of OK/Cancel
+                                    showModal(data, null, null);
                                     callback(false);
                                 } else if (data.showPopup) {
+                                    // showPopup but not blockBuild: OK=build, Cancel=no build
                                     showModal(data, function() {
                                         callback(true);
+                                    }, function() {
+                                        callback(false);
                                     });
                                 } else {
                                     callback(true);

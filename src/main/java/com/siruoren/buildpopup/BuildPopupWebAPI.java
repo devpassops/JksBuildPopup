@@ -124,8 +124,9 @@ public class BuildPopupWebAPI implements UnprotectedRootAction {
         // 执行 Groovy 脚本
         BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(job, null, envVars, params);
 
-        // 返回结果 JSON
+        // 返回结果 JSON（确保 UTF-8 编码，避免中文乱码）
         rsp.setContentType("application/json;charset=UTF-8");
+        rsp.setCharacterEncoding("UTF-8");
         JSONObject json = new JSONObject();
         json.put("blockBuild", result.isBlockBuild());
         json.put("showPopup", result.isShowPopup());
@@ -151,6 +152,7 @@ public class BuildPopupWebAPI implements UnprotectedRootAction {
         BuildPopupResult result = BuildPopupAction.getLatestPopupResult(jobName);
 
         rsp.setContentType("application/json;charset=UTF-8");
+        rsp.setCharacterEncoding("UTF-8");
         JSONObject json = new JSONObject();
         if (result != null) {
             json.put("hasPopup", true);
@@ -184,6 +186,7 @@ public class BuildPopupWebAPI implements UnprotectedRootAction {
         BuildPopupAction.dismissPopup(jobName, popupId);
 
         rsp.setContentType("application/json;charset=UTF-8");
+        rsp.setCharacterEncoding("UTF-8");
         JSONObject json = new JSONObject();
         json.put("success", true);
         rsp.getWriter().write(json.toString());
@@ -206,6 +209,7 @@ public class BuildPopupWebAPI implements UnprotectedRootAction {
 
     /** 写入允许构建的 JSON */
     private void writeAllowJson(StaplerResponse rsp) throws Exception {
+        rsp.setCharacterEncoding("UTF-8");
         JSONObject json = new JSONObject();
         json.put("blockBuild", false);
         json.put("showPopup", false);
