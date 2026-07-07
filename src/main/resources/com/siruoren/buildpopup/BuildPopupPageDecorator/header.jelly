@@ -205,31 +205,25 @@
                 xhr.send();
             }
 
-            // Trigger non-parameterized build via hidden form POST
+            // Trigger non-parameterized build via direct navigation
             function triggerBuildPost(buildUrl) {
                 var crumbValue = getCrumb();
-
-                var form = document.createElement('form');
-                form.setAttribute('method', 'POST');
-                form.setAttribute('action', buildUrl);
-                form.style.display = 'none';
-
-                if (crumbValue) {
-                    var crumbInput = document.createElement('input');
-                    crumbInput.setAttribute('type', 'hidden');
-                    crumbInput.setAttribute('name', 'Jenkins-Crumb');
-                    crumbInput.setAttribute('value', crumbValue);
-                    form.appendChild(crumbInput);
-                }
-
-                var jsonInput = document.createElement('input');
-                jsonInput.setAttribute('type', 'hidden');
-                jsonInput.setAttribute('name', 'json');
-                jsonInput.setAttribute('value', '{}');
-                form.appendChild(jsonInput);
-
-                document.body.appendChild(form);
-                form.submit();
+                
+                // Use fetch to trigger build with POST, then redirect to job page
+                fetch(buildUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Jenkins-Crumb': crumbValue || ''
+                    },
+                    body: 'json={}'
+                }).then(function(response) {
+                    // After triggering build, redirect to job page
+                    window.location.href = window.location.pathname;
+                }).catch(function(error) {
+                    // On error, still redirect to job page
+                    window.location.href = window.location.pathname;
+                });
             }
 
             // Collect actual parameter values from the build form for Groovy check
