@@ -325,7 +325,3 @@ mvn test
 ## 许可证
 
 MIT License
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/chart?repos=devpassops/JksBuildPopup&type=date&legend=top-left&sealed_token=sHeEFgRa0Fp8muOgucC9KSHV32N2eT8k8Uoxe7upXwJ8zoxwhqM59MvP7pAzFfmjmusRMmEXkQLGCbfInS2q163gVI7z40RlLZ5yjaz3W9W3xGHalt-qDkOo_-SoYP-rvIJJFaTB3BOT9RRjBZCsyr_d9AyQrr3ELTKQeOHYOmWmP50KXk41t9dqKLFI)](https://www.star-history.com/?repos=devpassops%2FJksBuildPopup&type=date&legend=top-left)
