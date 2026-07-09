@@ -2,14 +2,17 @@ package com.siruoren.buildpopup;
 
 import groovy.lang.Binding;
 import groovy.lang.GroovyShell;
+import hudson.model.Cause;
 import hudson.model.Job;
 import hudson.model.Run;
+import hudson.model.User;
 import jenkins.model.Jenkins;
 import org.jenkinsci.plugins.scriptsecurity.sandbox.RejectedAccessException;
 import org.jenkinsci.plugins.scriptsecurity.sandbox.whitelists.Whitelisted;
 import org.jenkinsci.plugins.scriptsecurity.sandbox.groovy.GroovySandbox;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -58,7 +61,8 @@ public class BuildPopupService {
 
     public BuildPopupResult executeGroovy(Job<?, ?> job, Run<?, ?> run,
                                            Map<String, String> envVars,
-                                           Map<String, String> params) {
+                                           Map<String, String> params,
+                                           String currentUser) {
         BuildPopupGlobalConfiguration globalConfig = BuildPopupGlobalConfiguration.get();
 
         if (!globalConfig.isGloballyEnabled()) {
@@ -98,7 +102,7 @@ public class BuildPopupService {
             }
 
             Future<BuildPopupResult> future = BuildPopupThreadPool.getInstance().submit(
-                new GroovyExecutionTask(job, run, envVars, params, groovyScript, useSandbox)
+                new GroovyExecutionTask(job, run, envVars, params, groovyScript, useSandbox, currentUser)
             );
 
             try {
@@ -136,18 +140,21 @@ public class BuildPopupService {
         private final Map<String, String> params;
         private final String groovyScript;
         private final boolean useSandbox;
+        private final String currentUser;
 
         GroovyExecutionTask(Job<?, ?> job, Run<?, ?> run,
                             Map<String, String> envVars,
                             Map<String, String> params,
                             String groovyScript,
-                            boolean useSandbox) {
+                            boolean useSandbox,
+                            String currentUser) {
             this.job = job;
             this.run = run;
             this.envVars = envVars != null ? envVars : new HashMap<>();
             this.params = params != null ? params : new HashMap<>();
             this.groovyScript = groovyScript;
             this.useSandbox = useSandbox;
+            this.currentUser = currentUser;
         }
 
         @Override
@@ -159,6 +166,11 @@ public class BuildPopupService {
                 binding.setVariable("jenkins", Jenkins.getInstanceOrNull());
                 binding.setVariable("env", envVars);
                 binding.setVariable("params", params);
+                
+                // Get build user and set as variable
+                String buildUser = getBuildUser(run, currentUser);
+                binding.setVariable("buildUser", buildUser != null ? buildUser : "");
+                
                 if (run != null) {
                     binding.setVariable("build", run);
                     binding.setVariable("currentBuild", run);
@@ -249,6 +261,31 @@ public class BuildPopupService {
             if (value instanceof Boolean) return (Boolean) value;
             if (value instanceof String) return Boolean.parseBoolean((String) value);
             return defaultValue;
+        }
+
+        /**
+         * Get the user who triggered the build from the run's causes or current session
+         */
+        private String getBuildUser(Run<?, ?> run, String currentUser) {
+            // If run is available, try to get user from causes
+            if (run != null) {
+                for (Cause cause : run.getCauses()) {
+                    if (cause instanceof Cause.UserIdCause) {
+                        return ((Cause.UserIdCause) cause).getUserId();
+                    } else if (cause instanceof Cause.UpstreamCause) {
+                        // For upstream builds, try to get the original user
+                        Cause.UpstreamCause upstreamCause = (Cause.UpstreamCause) cause;
+                        List<Cause> upstreamCauses = upstreamCause.getUpstreamCauses();
+                        for (Cause upstreamCauseItem : upstreamCauses) {
+                            if (upstreamCauseItem instanceof Cause.UserIdCause) {
+                                return ((Cause.UserIdCause) upstreamCauseItem).getUserId();
+                            }
+                        }
+                    }
+                }
+            }
+            // Fall back to current session user (for pre-build checks)
+            return currentUser;
         }
     }
 }

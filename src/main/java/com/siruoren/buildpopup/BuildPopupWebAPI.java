@@ -4,6 +4,8 @@ import hudson.Extension;
 import hudson.model.Item;
 import hudson.model.Job;
 import hudson.model.UnprotectedRootAction;
+import hudson.model.User;
+import jenkins.model.Jenkins;
 import net.sf.json.JSONObject;
 import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.StaplerResponse;
@@ -119,8 +121,15 @@ public class BuildPopupWebAPI implements UnprotectedRootAction {
         }
         Map<String, String> envVars = new HashMap<>();
 
+        // Get current logged-in user
+        String currentUser = "";
+        User user = User.current();
+        if (user != null) {
+            currentUser = user.getId();
+        }
+
         // 执行 Groovy 脚本
-        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(job, null, envVars, params);
+        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(job, null, envVars, params, currentUser);
 
         // 返回结果 JSON（确保 UTF-8 编码，避免中文乱码）
         rsp.setContentType("application/json;charset=UTF-8");

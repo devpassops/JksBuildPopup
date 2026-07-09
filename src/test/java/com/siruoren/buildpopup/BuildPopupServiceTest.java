@@ -28,7 +28,7 @@ public class BuildPopupServiceTest {
         BuildPopupGlobalConfiguration globalConfig = BuildPopupGlobalConfiguration.get();
         globalConfig.setGloballyEnabled(false);
         
-        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), new HashMap<>());
+        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), new HashMap<>(), "");
         
         assertFalse(result.isShowPopup());
         assertFalse(result.isBlockBuild());
@@ -46,7 +46,7 @@ public class BuildPopupServiceTest {
         BuildPopupJobProperty prop = new BuildPopupJobProperty(false);
         project.addProperty(prop);
         
-        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), new HashMap<>());
+        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), new HashMap<>(), "");
         
         assertFalse(result.isShowPopup());
         assertFalse(result.isBlockBuild());
@@ -64,7 +64,7 @@ public class BuildPopupServiceTest {
         prop.setGroovyScript("");
         project.addProperty(prop);
         
-        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), new HashMap<>());
+        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), new HashMap<>(), "");
         
         assertFalse(result.isShowPopup());
         assertFalse(result.isBlockBuild());
@@ -82,7 +82,7 @@ public class BuildPopupServiceTest {
         prop.setGroovyScript("return [blockBuild: false, showPopup: true, popupContent: 'Test message', popupTitle: 'Test']");
         project.addProperty(prop);
         
-        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), new HashMap<>());
+        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), new HashMap<>(), "");
         
         assertTrue(result.isShowPopup());
         assertFalse(result.isBlockBuild());
@@ -105,7 +105,7 @@ public class BuildPopupServiceTest {
         Map<String, String> params = new HashMap<>();
         params.put("DEPLOY_ENV", "production");
         
-        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), params);
+        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), params, "");
         
         assertTrue(result.isShowPopup());
         assertEquals("Env: production", result.getPopupContent());
@@ -123,7 +123,7 @@ public class BuildPopupServiceTest {
         prop.setGroovyScript("invalid groovy syntax {{{");
         project.addProperty(prop);
         
-        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), new HashMap<>());
+        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), new HashMap<>(), "");
         
         assertTrue(result.isError());
         assertNotNull(result.getPopupContent());
@@ -142,7 +142,7 @@ public class BuildPopupServiceTest {
         prop.setScriptTimeout(1); // 1 second timeout
         project.addProperty(prop);
         
-        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), new HashMap<>());
+        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), new HashMap<>(), "");
         
         assertTrue(result.isError());
         assertTrue(result.getErrorMessage().contains("timed out"));
@@ -163,7 +163,7 @@ public class BuildPopupServiceTest {
         prop.setGroovyScript("return [blockBuild: true, showPopup: true, popupContent: 'blocked']");
         project.addProperty(prop);
 
-        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), new HashMap<>());
+        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), new HashMap<>(), "");
 
         assertTrue("showPopup should be true", result.isShowPopup());
         assertTrue("blockBuild should be true", result.isBlockBuild());
@@ -184,7 +184,7 @@ public class BuildPopupServiceTest {
         prop.setGroovyScript("return true");
         project.addProperty(prop);
 
-        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), new HashMap<>());
+        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), new HashMap<>(), "");
 
         // Boolean true → blockBuild=true, showPopup=true
         assertTrue("blockBuild should be true for Boolean return", result.isBlockBuild());
@@ -205,7 +205,7 @@ public class BuildPopupServiceTest {
         prop.setGroovyScript("return null");
         project.addProperty(prop);
 
-        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), new HashMap<>());
+        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), new HashMap<>(), "");
 
         assertFalse("showPopup should be false for null return", result.isShowPopup());
         assertFalse("blockBuild should be false for null return", result.isBlockBuild());
@@ -224,7 +224,7 @@ public class BuildPopupServiceTest {
         prop.setGroovyScript("return 'please confirm'");
         project.addProperty(prop);
 
-        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), new HashMap<>());
+        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), new HashMap<>(), "");
 
         // String return → blockBuild=true, showPopup=true, popupContent=the string
         assertTrue("blockBuild should be true for String return", result.isBlockBuild());
@@ -245,7 +245,7 @@ public class BuildPopupServiceTest {
         prop.setGroovyScript("return [blockBuild: false, showPopup: true, popupContent: 'msg', popupTitle: 'Custom Title']");
         project.addProperty(prop);
 
-        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), new HashMap<>());
+        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), new HashMap<>(), "");
 
         assertTrue(result.isShowPopup());
         assertEquals("Custom Title", result.getPopupTitle());
@@ -268,7 +268,7 @@ public class BuildPopupServiceTest {
         Map<String, String> params = new HashMap<>();
         params.put("DEPLOY_ENV", "staging");
 
-        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), params);
+        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), params, "");
 
         assertTrue(result.isShowPopup());
         assertEquals("Direct: staging", result.getPopupContent());
@@ -294,7 +294,7 @@ public class BuildPopupServiceTest {
         Thread bgThread = new Thread(() -> {
             try {
                 backgroundResult[0] = BuildPopupService.getInstance().executeGroovy(
-                    project, null, new HashMap<>(), new HashMap<>());
+                    project, null, new HashMap<>(), new HashMap<>(), "");
             } catch (Exception e) {
                 // ignore
             }
@@ -305,7 +305,7 @@ public class BuildPopupServiceTest {
         Thread.sleep(500);
 
         // Now try to execute from the main thread — should exceed concurrency limit
-        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), new HashMap<>());
+        BuildPopupResult result = BuildPopupService.getInstance().executeGroovy(project, null, new HashMap<>(), new HashMap<>(), "");
 
         assertTrue("Should be an error due to concurrency limit", result.isError());
 

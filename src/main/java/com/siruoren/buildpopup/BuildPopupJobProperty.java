@@ -99,9 +99,10 @@ public class BuildPopupJobProperty extends JobProperty<Job<?, ?>> {
 
         public String getDefaultGroovyScript() {
             return "// Build Popup Groovy Script\n"
-                + "// Bindings: job, jenkins, env, params\n"
+                + "// Bindings: job, jenkins, env, params, buildUser\n"
                 + "// Build parameters are available as direct variables (e.g. DEPLOY_ENV, BRANCH)\n"
                 + "//   also accessible via params map: params.get('DEPLOY_ENV')\n"
+                + "// buildUser: The user who triggered the build (if available)\n"
                 + "// MUST return a Map: return [blockBuild: true, showPopup: true, popupContent: 'msg', popupTitle: 'title']\n"
                 + "// Keys:\n"
                 + "//   blockBuild   - Boolean, true=block build (only show popup), default=false\n"
