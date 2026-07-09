@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.1-SNAPSHOT] - 2026-07-09
+
+### Added
+
+- 新增 `buildUser` 变量：自动获取构建触发用户
+- 支持从当前会话获取登录用户（构建前检查时）
+- 支持从构建 Cause 获取触发用户（构建进行中时）
+- 支持上游构建追溯原始触发用户
+
+### Changed
+
+- Script Security 版本从 1.77 降级到 1.76（兼容 Jenkins 2.277.4）
+- 更新默认 Groovy 脚本注释，添加 buildUser 变量说明
+
+### Fixed
+
+- 修复 buildUser 变量未注入导致脚本执行错误的问题
+- 确保变量始终存在（空字符串作为默认值）
+
 ## [1.0.0] - 2026-07-07
 
 ### Added
@@ -88,6 +107,6 @@ All notable changes to this project will be documented in this file.
 - JDK: 11
 - Parent POM: 4.62
 - HPI Plugin: 3.28
-- Script Security: 1.77
+- Script Security: 1.76
 - Structs: 1.22
 - 无外部依赖，仅使用 Jenkins/Stapler 内置库
